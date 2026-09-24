@@ -15,22 +15,24 @@ modelo.
 
 ## Estado
 
-**Semilla.** El repositorio tiene el harness y la documentación funcional completos. **No hay
-código todavía.** La primera rebanada por implementar es R0 (esqueleto caminante).
+**R0 en local, sin desplegar.** La aplicación existe: lee la tabla `programs` de Neon y muestra
+el programa semilla en la página raíz. Falta el despliegue en Vercel, que es el criterio de
+hecho de R0. Ver [`session-handoff.md`](./session-handoff.md).
 
 ## Stack
 
-Next.js 16 (App Router) · TypeScript · React 19 · Tailwind · shadcn/ui · Drizzle ORM ·
-Postgres (Neon) · Vercel · Vitest
+Next.js 16 (App Router) · TypeScript · React 19 · Tailwind · Drizzle ORM · Postgres (Neon) ·
+Vercel. shadcn/ui llega con R3 y Vitest con R1.
 
 ## Arranque
 
 ```bash
 cp .env.example .env     # completa DATABASE_URL con tu base de Neon
-./init.sh
+./init.sh                # instala, verifica tipos, lint y build
+npm run db:push          # aplica el esquema a la base
+npm run db:seed          # siembra el programa inicial
+npm run dev              # http://localhost:3000
 ```
-
-Mientras no exista `package.json`, `init.sh` solo valida el entorno y termina. Es lo esperado.
 
 ## Documentación
 
