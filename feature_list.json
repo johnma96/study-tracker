@@ -1,0 +1,89 @@
+{
+  "project": "study-tracker",
+  "description": "Tracker de sesiones de estudio multi-programa. Mide tiempo, guarda evidencia y grafica metricas propias de cada programa.",
+  "lastUpdated": "2026-09-24",
+  "policy": {
+    "oneFeatureAtATime": true,
+    "statusValues": ["not_started", "active", "blocked", "passing"],
+    "passRule": "Una feature pasa a 'passing' solo con el campo 'evidence' lleno: comando ejecutado y salida resumida. Nunca por inspeccion visual."
+  },
+  "features": [
+    {
+      "id": "R0",
+      "name": "Esqueleto caminante",
+      "description": "Next.js 16 App Router + Drizzle + Neon, desplegado en Vercel, mostrando una fila leida de la base de datos.",
+      "requirements": ["RF-01"],
+      "dependencies": [],
+      "status": "active",
+      "verification": "npm run build && npm run check, y la URL de Vercel carga mostrando el dato",
+      "evidence": null,
+      "testedAt": null
+    },
+    {
+      "id": "R1",
+      "name": "Programas",
+      "description": "Crear y listar programas. Sembrar 'Harness Engineering' con sus cuatro tipos de sesion.",
+      "requirements": ["RF-10", "RF-11", "RF-12", "RF-13", "RF-14", "RF-15"],
+      "dependencies": ["R0"],
+      "status": "not_started",
+      "verification": "npm run test -- programs, y crear un programa por la interfaz persiste tras recargar",
+      "evidence": null,
+      "testedAt": null
+    },
+    {
+      "id": "R2",
+      "name": "Cronometro de sesion",
+      "description": "Iniciar, ver en curso, detener, cancelar y registrar manualmente. El tiempo transcurrido se deriva de la marca de inicio almacenada, nunca de un contador en el navegador.",
+      "requirements": ["RF-00", "RF-20", "RF-21", "RF-22", "RF-23", "RF-24", "RF-25", "RF-26", "RF-27", "RF-28", "RF-29"],
+      "dependencies": ["R1"],
+      "status": "not_started",
+      "verification": "npm run test -- session, e iniciar sesion, cerrar el navegador, reabrir y ver la sesion aun corriendo con el tiempo correcto",
+      "evidence": null,
+      "testedAt": null
+    },
+    {
+      "id": "R3",
+      "name": "Totales y mapa de calor",
+      "description": "Dias trabajados, horas totales, media por sesion, racha, mapa de calor de calendario y cadencia semanal.",
+      "requirements": ["RF-30", "RF-31", "RF-32", "RF-33", "RF-34", "RF-35", "RF-36", "RF-37"],
+      "dependencies": ["R2"],
+      "status": "not_started",
+      "verification": "npm run test -- stats, incluyendo un caso con sesion iniciada despues de las 19:00 hora de Colombia que debe contar en el dia local correcto",
+      "evidence": null,
+      "testedAt": null
+    },
+    {
+      "id": "R4",
+      "name": "Evidencia enlazada",
+      "description": "Adjuntar artefactos a una sesion y verlos como enlaces. No se almacenan archivos, solo referencias.",
+      "requirements": ["RF-50", "RF-51", "RF-52", "RF-53", "RF-54"],
+      "dependencies": ["R2"],
+      "status": "not_started",
+      "verification": "npm run test -- artifacts, y un artefacto tipo doc abre el archivo real en GitHub",
+      "evidence": null,
+      "testedAt": null
+    },
+    {
+      "id": "R5",
+      "name": "Metricas de progreso",
+      "description": "Definir metricas por programa, registrar lecturas y graficar la serie de tiempo con su linea de objetivo.",
+      "requirements": ["RF-60", "RF-61", "RF-62", "RF-63"],
+      "dependencies": ["R2"],
+      "status": "not_started",
+      "verification": "npm run test -- metrics, y cargar los scores de validate-harness.mjs del curso muestra la curva con objetivo en 80",
+      "evidence": null,
+      "testedAt": null
+    },
+    {
+      "id": "R6",
+      "name": "Autenticacion",
+      "description": "Auth.js con un proveedor OAuth y lista blanca por variable de entorno. Es compuerta de despliegue, no etapa final del cronograma.",
+      "requirements": ["RF-40", "RF-41", "RF-42", "RF-43", "RF-44"],
+      "dependencies": ["R0"],
+      "status": "not_started",
+      "verification": "npm run test -- auth, y un navegador sin sesion no puede leer ni escribir nada",
+      "evidence": null,
+      "testedAt": null
+    }
+  ]
+}

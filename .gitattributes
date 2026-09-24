@@ -1,0 +1,11 @@
+# Normalizacion de fin de linea.
+* text=auto eol=lf
+
+# Los scripts de shell DEBEN quedar en LF.
+# Con CRLF, bash falla con: bad interpreter: /usr/bin/env bash^M
+*.sh text eol=lf
+
+# Binarios sin conversion.
+*.png binary
+*.jpg binary
+*.ico binary

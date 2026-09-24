@@ -1,0 +1,34 @@
+# Dependencias
+node_modules/
+.pnp
+.pnp.js
+
+# Next.js
+.next/
+out/
+build/
+next-env.d.ts
+
+# Produccion
+dist/
+
+# Entorno - NUNCA versionar secretos
+.env
+.env.local
+.env*.local
+
+# Vercel
+.vercel
+
+# Pruebas y cobertura
+coverage/
+
+# Editor y SO
+.DS_Store
+Thumbs.db
+.idea/
+*.swp
+
+# Logs
+*.log
+npm-debug.log*
