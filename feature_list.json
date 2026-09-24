@@ -33,11 +33,11 @@
     {
       "id": "R2",
       "name": "Cronometro de sesion",
-      "description": "Iniciar, ver en curso, detener, cancelar y registrar manualmente. El tiempo transcurrido se deriva de la marca de inicio almacenada, nunca de un contador en el navegador.",
-      "requirements": ["RF-00", "RF-20", "RF-21", "RF-22", "RF-23", "RF-24", "RF-25", "RF-26", "RF-27", "RF-28", "RF-29"],
+      "description": "Iniciar, pausar, reanudar, detener, cancelar y registrar manualmente. El tiempo transcurrido se deriva de la marca de inicio almacenada, nunca de un contador en el navegador. Incluye el flujo de recuperacion de sesion abandonada, que es la valvula de escape del indice unico: sin el, una sesion huerfana bloquea la aplicacion de forma permanente.",
+      "requirements": ["RF-00", "RF-20", "RF-21", "RF-22", "RF-23", "RF-24", "RF-25", "RF-26", "RF-27", "RF-28", "RF-29", "RF-2A", "RF-2B", "RF-2C", "RF-2D", "RF-2E", "RF-2F", "RF-2G", "RF-2H", "RF-2I"],
       "dependencies": ["R1"],
       "status": "not_started",
-      "verification": "npm run test -- session, e iniciar sesion, cerrar el navegador, reabrir y ver la sesion aun corriendo con el tiempo correcto",
+      "verification": "npm run test -- session (incluye los seis casos de duracion efectiva de docs/DATA-MODEL.md), mas tres pruebas manuales: (1) iniciar, cerrar el navegador, reabrir y ver la sesion corriendo con el tiempo correcto; (2) pausar 10 min y verificar que no se acumulan; (3) simular sesion huerfana de mas de 8 horas y comprobar que el dialogo de recuperacion la desbloquea",
       "evidence": null,
       "testedAt": null
     },

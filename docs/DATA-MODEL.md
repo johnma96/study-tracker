@@ -29,9 +29,17 @@ Estas reglas se imponen **en la base de datos**, no solo en la aplicación.
 1. **Como máximo una sesión en curso en todo el sistema** (`ended_at IS NULL`). No se puede
    estudiar dos cosas a la vez. Se impone con un índice único parcial sobre una expresión
    constante. Una validación que solo viva en el cliente se salta abriendo dos pestañas.
+
+   > **Contrapartida obligatoria.** Esta misma restricción puede producir un punto muerto: si
+   > el navegador se cierra sin llamar al cierre, la sesión queda abierta y ninguna otra puede
+   > iniciar. Por eso `RF-2F` a `RF-2I` no son opcionales — son la válvula de escape del
+   > índice. Implementar el índice sin el flujo de recuperación deja la aplicación en un
+   > estado del que el usuario no puede salir.
 2. `ended_at`, cuando existe, es estrictamente posterior a `started_at`.
 3. `minutes_override`, cuando existe, es mayor que cero.
-4. `stuck_minutes` es mayor o igual a cero.
+4. `stuck_minutes` y `paused_seconds` son mayores o iguales a cero.
+4b. Una sesión cerrada (`ended_at` no nulo) no puede tener una pausa abierta (`paused_at` no
+   nulo). El cierre debe consolidar la pausa antes de guardar.
 5. Toda marca de tiempo se almacena en UTC (`timestamptz`). La conversión a `America/Bogota`
    ocurre al presentar y al agrupar por día — nunca al almacenar.
 6. Borrar un programa borra en cascada sus sesiones, tipos, métricas y lecturas.
@@ -41,13 +49,28 @@ Estas reglas se imponen **en la base de datos**, no solo en la aplicación.
 Regla única, implementada en `core/services` y probada sin base de datos:
 
 ```
+pausaTotal(sesion) =
+  sesion.pausedSeconds
+  + (ahora - sesion.pausedAt)   si pausedAt no es nulo (pausa abierta)
+
 duracionEfectiva(sesion) =
-  sesion.minutesOverride              si minutesOverride no es nulo
-  redondear((endedAt - startedAt)/60) si endedAt no es nulo
-  null                                si la sesión está en curso
+  sesion.minutesOverride                                    si minutesOverride no es nulo
+  redondear(((endedAt - startedAt) - pausaTotal) / 60)      si endedAt no es nulo
+  null                                                      si la sesión está en curso
 ```
 
 `RF-25` obliga a pedir confirmación cuando el cálculo supera 480 minutos.
+
+Casos que las pruebas deben cubrir, sin base de datos:
+
+| Caso | Esperado |
+|---|---|
+| Sesión de 60 min sin pausas | 60 |
+| Sesión de 60 min con una pausa de 10 | 50 |
+| Sesión de 60 min con tres pausas de 5 | 45 |
+| Detener con pausa abierta (`RF-2D`) | la pausa se cierra antes de calcular |
+| `minutesOverride` presente | gana sobre todo lo demás, incluso sobre las pausas |
+| Sesión en curso | `null`, nunca 0 |
 
 ## DDL
 
@@ -80,13 +103,17 @@ CREATE TABLE sessions (
   session_type_id  uuid        REFERENCES session_types(id) ON DELETE SET NULL,
   started_at       timestamptz NOT NULL,
   ended_at         timestamptz,
+  paused_at        timestamptz,
+  paused_seconds   integer     NOT NULL DEFAULT 0 CHECK (paused_seconds >= 0),
   minutes_override integer     CHECK (minutes_override IS NULL OR minutes_override > 0),
   stuck_minutes    integer     NOT NULL DEFAULT 0 CHECK (stuck_minutes >= 0),
   note             text,
   source           text        NOT NULL DEFAULT 'timer'
                                CHECK (source IN ('timer','manual')),
   created_at       timestamptz NOT NULL DEFAULT now(),
-  CONSTRAINT ended_after_started CHECK (ended_at IS NULL OR ended_at > started_at)
+  CONSTRAINT ended_after_started CHECK (ended_at IS NULL OR ended_at > started_at),
+  -- Una sesión cerrada no puede quedar con una pausa abierta (RF-2D).
+  CONSTRAINT no_open_pause_when_ended CHECK (ended_at IS NULL OR paused_at IS NULL)
 );
 
 -- Invariante 1: como máximo una sesión en curso en todo el sistema.

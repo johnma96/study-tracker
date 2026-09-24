@@ -47,19 +47,27 @@ docs/DATA-MODEL.md  docs/ROADMAP.md
 
 ## Blockers
 
-Dos, ambos externos y a resolver por el usuario antes de R0:
+**Ninguno.** Los dos bloqueos externos quedaron resueltos:
 
-1. **Cuenta de Neon** con una base creada, y su `DATABASE_URL`.
-2. **Cuenta de Vercel** conectada al repositorio remoto.
-
-El repositorio no tiene remoto configurado todavía.
+- Proyecto de Neon creado, `DATABASE_URL` puesta en `.env` (no versionado).
+- Cuenta de Vercel disponible, plan Hobby. Falta importar el repositorio, lo cual es parte
+  de R0.
+- Remoto configurado: `github.com/johnma96/study-tracker`, rama `main`.
 
 ## Next Session
 
-Recommended Next Step:
+Recommended Next Step: implementar **R0 — Esqueleto caminante**.
 
-1. Resolver los dos bloqueos de arriba.
+1. `cd study-tracker` y confirmar con `pwd`. No trabajar desde el repositorio del curso.
 2. Ejecutar `./init.sh` y corregir lo que reporte.
 3. Leer `docs/ROADMAP.md`, sección R0.
-4. Implementar R0 como rebanada vertical: esquema → repositorio → página → despliegue.
-5. Cerrar la sesión según el procedimiento "End of Session" de `AGENTS.md`.
+4. Andamiaje, según `docs/ARCHITECTURE.md`:
+   `npx create-next-app@latest . --typescript --tailwind --app --eslint --src-dir`
+   más `drizzle-orm` y `@neondatabase/serverless`.
+   **Sin shadcn/ui ni Recharts todavía**: entran en R3, cuando haya tableros.
+5. Implementar como rebanada vertical: esquema → repositorio → página → despliegue en Vercel.
+6. Verificar el criterio de hecho: la URL de Vercel carga y muestra un dato leído de la base.
+7. Cerrar según el procedimiento "End of Session" de `AGENTS.md`.
+
+Trampa conocida de R0: `DATABASE_URL` debe existir **en los dos lados** — en `.env` local y en
+las variables de entorno del proyecto en Vercel. Es el fallo más común de esta rebanada.

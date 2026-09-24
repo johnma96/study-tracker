@@ -82,7 +82,8 @@ sistema debe rechazar la operación e indicar cuál sesión está abierta.
 fin y calcular la duración efectiva.
 
 **RF-24.** El sistema debe calcular la duración efectiva así: si existe `minutes_override`,
-ese es el valor; si no, `fin − inicio` redondeado al minuto más cercano.
+ese es el valor; si no, `(fin − inicio) − tiempo total en pausa`, redondeado al minuto más
+cercano.
 
 **RF-25.** Cuando el usuario detiene una sesión cuya duración supera las 8 horas, el sistema
 debe pedir confirmación y ofrecer corregir la duración antes de guardar.
@@ -105,6 +106,52 @@ nota libre y los minutos de atasco (`stuck_minutes`).
 
 **RF-29.** Si el usuario intenta detener una sesión cuando no hay ninguna en curso, entonces
 el sistema debe informarlo sin generar error.
+
+---
+
+## Bloque 2b — Pausas
+
+> Las pausas no son un lujo: la estructura de sesión de estudio prevista tiene un descanso
+> intermedio. Sin este bloque quedan dos malas opciones — fragmentar el registro en dos
+> sesiones, o dejar correr el reloj durante el descanso e inflar los minutos.
+
+**RF-2A.** Cuando el usuario pausa la sesión en curso, el sistema debe registrar el instante
+de la pausa y dejar de acumular tiempo efectivo.
+
+**RF-2B.** Mientras la sesión esté pausada, el sistema debe mostrarla como pausada, con el
+tiempo efectivo acumulado hasta el momento de pausar y el tiempo que lleva en pausa.
+
+**RF-2C.** Cuando el usuario reanuda una sesión pausada, el sistema debe sumar el intervalo de
+la pausa al total acumulado de pausa y volver a acumular tiempo efectivo.
+
+**RF-2D.** Si el usuario detiene una sesión que está pausada, entonces el sistema debe cerrar
+la pausa abierta antes de calcular la duración efectiva.
+
+**RF-2E.** El sistema debe permitir pausar y reanudar cualquier número de veces dentro de una
+misma sesión.
+
+---
+
+## Bloque 2c — Recuperación de sesión abandonada
+
+> **Este bloque existe porque la restricción de "máximo una sesión en curso" puede producir un
+> punto muerto.** Si el navegador se cierra sin llamar al cierre de la sesión, esa sesión queda
+> abierta de forma indefinida y el índice único impide iniciar cualquier otra. El mecanismo que
+> da robustez es el mismo que puede bloquear la aplicación.
+
+**RF-2F.** El sistema debe permitir cerrar o descartar la sesión en curso desde cualquier
+vista, sin depender de la pantalla donde se inició. Una sesión abandonada nunca debe poder
+bloquear de forma permanente el inicio de una nueva.
+
+**RF-2G.** Cuando el usuario abre la aplicación y existe una sesión en curso cuyo inicio
+supera las 8 horas, el sistema debe presentar un diálogo de recuperación con tres opciones:
+cerrarla indicando la duración real, descartarla, o continuarla.
+
+**RF-2H.** Si el usuario cierra una sesión desde el diálogo de recuperación indicando una
+duración, entonces el sistema debe guardar ese valor en `minutes_override`.
+
+**RF-2I.** El sistema debe mostrar el estado de la sesión en curso —corriendo o pausada— en
+todas las vistas, no solo en la del cronómetro.
 
 ---
 
@@ -202,7 +249,9 @@ del cliente.
 |---|---|---|
 | 0 Esqueleto | RF-01 | Aplicación desplegada leyendo de la base |
 | 1 Programas | RF-10 … RF-15 | Crear y listar programas |
-| 2 **Cronómetro** | RF-20 … RF-29, RF-00 | **Registrar tiempo real** |
+| 2 **Cronómetro** | RF-00, RF-20 … RF-29 | **Registrar tiempo real** |
+| 2b Pausas | RF-2A … RF-2E | Descansos sin inflar ni fragmentar |
+| 2c Recuperación | RF-2F … RF-2I | Una sesión abandonada no bloquea |
 | 3 Totales | RF-30 … RF-37 | Días, horas, mapa de calor, cadencia |
 | 4 Evidencia | RF-50 … RF-54 | Artefactos enlazados |
 | 5 Métricas | RF-60 … RF-63 | Series de progreso |

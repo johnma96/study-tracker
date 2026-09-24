@@ -56,22 +56,28 @@ cuatro tipos de sesión.
 - **Requerimientos:** RF-10 … RF-15
 - **Hecho cuando:** creas un programa por la interfaz, recargas y sigue ahí.
 
-### R2 — Cronómetro · 1-2 sesiones · **el corazón del MVP**
+### R2 — Cronómetro · 2 sesiones · **el corazón del MVP**
 
-Iniciar, ver en curso, detener, cancelar, registro manual.
+Iniciar, pausar, reanudar, detener, cancelar, registro manual y recuperación de sesión
+abandonada.
 
-- **Requerimientos:** RF-00, RF-20 … RF-29
-- **Hecho cuando:** inicias una sesión, **cierras el navegador**, lo vuelves a abrir y la
-  sesión sigue corriendo con el tiempo correcto. Luego la detienes y queda guardada.
+- **Requerimientos:** RF-00, RF-20 … RF-29, RF-2A … RF-2I
+- **Hecho cuando:** las tres pruebas manuales pasan — sobrevive a cerrar el navegador, una
+  pausa de 10 minutos no se acumula, y una sesión huérfana de más de 8 horas se puede
+  desbloquear desde el diálogo de recuperación.
 
-Tres cosas que definen si esta rebanada quedó bien:
+Cuatro cosas que definen si esta rebanada quedó bien:
 
 - **El tiempo transcurrido se deriva de la marca de inicio almacenada**, nunca de un contador
   en JavaScript. Es lo que hace que sobreviva a cerrar la pestaña.
 - **La sesión única en curso se impone con el índice de base de datos**, no con una validación
   de interfaz.
-- **`minutes_override` existe desde el primer día.** Vas a olvidar detener el cronómetro; sin
-  este campo, un olvido arruina las estadísticas.
+- **El flujo de recuperación se implementa junto con el índice, no después.** El índice y el
+  punto muerto son la misma moneda: sin válvula de escape, una sesión huérfana deja la
+  aplicación inutilizable y solo se arregla entrando a la base a mano.
+- **`minutes_override` y las pausas existen desde el primer día.** Vas a olvidar detener el
+  cronómetro, y tus sesiones de estudio tienen un descanso intermedio por diseño. Agregar
+  cualquiera de los dos después implica migrar datos reales.
 
 ### R3 — Totales y mapa de calor · 1 sesión
 
