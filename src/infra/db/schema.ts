@@ -155,3 +155,59 @@ export const sessions = pgTable(
 );
 
 export type SessionRow = typeof sessions.$inferSelect;
+
+// R4 — artifacts ---------------------------------------------------------------
+
+/**
+ * Esquema Drizzle de `artifacts` (R4, RF-50 a RF-54), transcrito del DDL de
+ * docs/DATA-MODEL.md.
+ *
+ * **Referencias, nunca archivos (RF-54).** `target` guarda una URL o una ruta
+ * relativa de repositorio; no hay ninguna columna binaria ni de contenido. La
+ * prueba `src/core/no-file-storage.test.ts` lee este archivo y las migraciones
+ * y falla si aparece una.
+ *
+ * `ON DELETE CASCADE`: un artefacto no tiene sentido sin su sesión. Descartar
+ * una sesión (RF-27, RF-2G) se lleva su evidencia, y borrar un programa se la
+ * lleva a través de la cascada de `sessions` (invariante 6).
+ *
+ * Diferencias deliberadas frente al DDL del documento, mismo criterio que
+ * `session_types` en R1:
+ *
+ * - Los CHECK llevan nombre explícito (Drizzle lo exige y un nombre estable no
+ *   cambia entre entornos).
+ * - Se añaden `artifacts_label_not_empty` y `artifacts_target_not_empty`. RF-50
+ *   hace obligatorios la etiqueta y el destino, y `NOT NULL` solo impide el
+ *   nulo: deja pasar la cadena vacía. **No** se replican en el motor los topes
+ *   de longitud de `core/services` (120 y 2048): son criterio de interfaz, y la
+ *   decisión 17 de docs/ARCHITECTURE.md evita migrar el esquema por uno.
+ * - El índice `artifacts_by_session` no está en el DDL. La lectura de R4 es
+ *   siempre "los artefactos de estas sesiones", y Postgres **no** indexa por su
+ *   cuenta la columna de una clave foránea.
+ */
+export const artifacts = pgTable(
+  'artifacts',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    sessionId: uuid('session_id')
+      .notNull()
+      .references(() => sessions.id, { onDelete: 'cascade' }),
+    kind: text('kind').notNull(),
+    label: text('label').notNull(),
+    target: text('target').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    // RF-51
+    check(
+      'artifacts_kind_valid',
+      sql`${table.kind} in ('doc','image','repo','link','commit')`,
+    ),
+    // RF-50 — etiqueta y destino obligatorios: tampoco vale la cadena vacía.
+    check('artifacts_label_not_empty', sql`char_length(${table.label}) >= 1`),
+    check('artifacts_target_not_empty', sql`char_length(${table.target}) >= 1`),
+    index('artifacts_by_session').on(table.sessionId, table.createdAt),
+  ],
+);
+
+export type ArtifactRow = typeof artifacts.$inferSelect;
