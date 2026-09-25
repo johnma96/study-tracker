@@ -222,6 +222,34 @@ guardia deliberada: si el índice se perdiera por el camino —una versión de `
 deje de emitirlo, una migración generada sin revisar— un clon limpio quedaría sin la
 restricción y nadie se enteraría hasta que convivieran dos sesiones en curso.
 
+## Una sola base de repositorio por programa, y por qué
+
+`programs.repo_url` es **una columna**, así que un programa tiene una sola base contra la cual
+resolver rutas relativas de evidencia (`RF-52`). Un destino que no cuelgue de esa base se guarda
+como URL completa.
+
+**Esto es una simplificación deliberada, y contradice el principio central del producto.**
+`docs/PRODUCT.md` sostiene que cada programa define sus propias métricas y que el sistema
+grafica cualquier serie sin saber qué significa — por eso `metrics` es una tabla y no una
+columna `progreso_porcentaje`. Una columna `repo_url` hace justo lo contrario: **codifica en el
+esquema que existe una base y que es un repositorio.**
+
+Se acepta porque el caso real es uno: un repositorio del que se escriben muchas rutas cortas y
+repetitivas. Para lo demás —un bucket de almacenamiento, una carpeta compartida— la URL completa
+se copia del panel de todos modos, así que la ruta relativa no ahorra nada.
+
+**Condición de disparo.** Cuando aparezca un **segundo destino recurrente** en un mismo programa
+—al que se escriban rutas con frecuencia, no una URL suelta— la columna deja de alcanzar y toca
+la versión general:
+
+- Tabla `program_bases`: `program_id`, `alias`, `base_url`
+- Destinos con prefijo: `gh:docs/ROADMAP.md`, `gcs:reportes/2026-09.pdf`
+- `artifactHref` resuelve alias + ruta, sin saber qué es GitHub ni qué es un bucket
+
+No se construye antes porque diseñar el caso general sin un segundo caso concreto produce
+abstracciones que luego no encajan. Pero la decisión queda tomada: cuando llegue, es tabla con
+alias, no una segunda columna.
+
 ## Agrupación por día
 
 `RF-32` exige agrupar por fecha local, no por fecha UTC:
