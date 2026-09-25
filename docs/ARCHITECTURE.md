@@ -90,8 +90,19 @@ Variables de entorno necesarias (documéntalas en `.env.example`):
 
 ```
 DATABASE_URL=postgres://usuario:clave@host/base?sslmode=require
-TZ=America/Bogota
+APP_TIMEZONE=America/Bogota
 ```
+
+> **No uses el nombre `TZ`.** Vercel lo tiene reservado: es una variable de sistema que fija la
+> zona horaria del runtime de Node, y el despliegue se rechaza con
+> *"The name of your Environment Variable is reserved"*. Comprobado el 25/09/2026.
+>
+> La razón de fondo va más allá del nombre. `RF-00` fija `America/Bogota` como **regla de
+> dominio**, no como configuración: no cambia entre entornos. Una constante que no varía por
+> entorno no debería ser variable de entorno, porque si falta o se escribe mal en producción,
+> la agrupación por día se rompe **en silencio**. El lugar correcto es una constante en
+> `core/`. `APP_TIMEZONE` queda documentada por si algún día la zona se vuelve preferencia del
+> usuario, en cuyo caso pertenece a la base de datos, no al entorno.
 
 ## Registro de decisiones
 
