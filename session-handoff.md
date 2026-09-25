@@ -48,9 +48,10 @@ sigue diferida con riesgo aceptado y condiciones escritas en `RF-40`.
 
 ## What is broken or unverified
 
-- **Nada de esto se ha empujado.** `main` sigue por delante de `origin/main`. El próximo `git
-  push` llevará a producción las migraciones pendientes por `vercel-build`; en el registro del
-  build debe aparecer `migrations applied successfully`.
+- **El commit de R8 no se ha empujado.** Es el único que `main` tiene por delante de
+  `origin/main`, que ya está en `e2a599e`. **No trae migraciones:** R8 no tocó
+  `src/infra/db/schema.ts` y las cinco migraciones ya están en `origin/main`, así que el próximo
+  despliegue no aplica esquema nuevo.
 - **Sin verificar en producción.** La VPN corporativa bloquea `vercel.app`. Todo se verificó en
   local contra el branch `dev` de Neon.
 - **Confirmación humana de R8 pendiente (no bloquea):** abrir la página en un navegador, elegir
