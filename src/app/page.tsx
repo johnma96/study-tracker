@@ -1,9 +1,11 @@
 import { loadSessionSnapshot } from '@/app/current-session';
+import { loadMetricsSnapshot } from '@/app/metrics-snapshot';
 import type { Program } from '@/core/model/program';
 import type { SessionType } from '@/core/model/session-type';
-import { toCivilDateInAppZone } from '@/core/services/timezone';
+import { toCivilDateInAppZone, toCivilTimeInAppZone } from '@/core/services/timezone';
 import { drizzleProgramRepository } from '@/infra/repos/drizzle-program-repository';
 import { ManualSessionForm } from '@/ui/manual-session-form';
+import { MetricsSection } from '@/ui/metrics-section';
 import { ProgramCard } from '@/ui/program-card';
 import { ProgramForm } from '@/ui/program-form';
 import { StartSessionForm } from '@/ui/start-session-form';
@@ -51,7 +53,10 @@ export default async function Home() {
     error = 'No se pudo leer de la base de datos.';
   }
 
-  const snapshot = await loadSessionSnapshot();
+  const [snapshot, metricsSnapshot] = await Promise.all([
+    loadSessionSnapshot(),
+    loadMetricsSnapshot(), // R5
+  ]);
   const running = snapshot.running;
   const sessionTypesByProgram = groupByProgram(sessionTypes);
 
@@ -153,6 +158,16 @@ export default async function Home() {
               ))
             )}
           </section>
+
+          {/* R5 — métricas de progreso (RF-60 a RF-63). */}
+          <MetricsSection
+            programs={programs}
+            metrics={metricsSnapshot.metrics}
+            sessionOptions={metricsSnapshot.sessionOptions}
+            unavailable={metricsSnapshot.unavailable}
+            todayInAppZone={today}
+            nowTimeInAppZone={toCivilTimeInAppZone(new Date(snapshot.nowIso))}
+          />
         </>
       )}
     </main>

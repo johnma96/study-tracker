@@ -5,10 +5,9 @@
  * ni fallar. Se ejecuta con `npm run db:seed`, que carga `DATABASE_URL` desde
  * `.env` con `node --env-file`. La cadena de conexión nunca se imprime.
  *
- * R1 siembra `programs` y `session_types` (RF-15). La sección de datos semilla
- * de docs/DATA-MODEL.md menciona además la métrica "Harness score", pero
- * `metrics` y `readings` son tablas de R5 y su siembra va con esa rebanada:
- * crear una tabla cuya feature no existe deja código sin prueba que lo cubra.
+ * R1 siembra `programs` y `session_types` (RF-15). R5 siembra la métrica
+ * "Harness score" de la sección de datos semilla de docs/DATA-MODEL.md, en la
+ * rebanada donde nacen las tablas `metrics` y `readings`.
  */
 import { neon } from '@neondatabase/serverless';
 
@@ -78,4 +77,25 @@ console.log(
   added === 0
     ? `Tipos de sesión ya presentes (${SESSION_TYPES.length}). Sin cambios en session_types.`
     : `Tipos de sesión insertados: ${added} de ${SESSION_TYPES.length}.`,
+);
+
+// --- R5 — metrics -------------------------------------------------------------
+// La métrica del curso definida en la sección de datos semilla de
+// docs/DATA-MODEL.md. Es un dato del programa, no un concepto del código: el
+// sistema la grafica igual que cualquier otra. `on conflict do nothing` sobre
+// UNIQUE (program_id, name) la hace idempotente, con el mismo criterio que los
+// tipos de sesión.
+const METRIC = { name: 'Harness score', unit: 'puntos', direction: 'up', target: 80 };
+
+const metricRows = await sql`
+  insert into metrics (program_id, name, unit, direction, target)
+  values (${program.id}, ${METRIC.name}, ${METRIC.unit}, ${METRIC.direction}, ${METRIC.target})
+  on conflict (program_id, name) do nothing
+  returning name
+`;
+
+console.log(
+  metricRows.length === 0
+    ? `Métrica ya presente: "${METRIC.name}". Sin cambios en metrics.`
+    : `Métrica insertada: "${METRIC.name}" (${METRIC.unit}, objetivo ${METRIC.target}).`,
 );
