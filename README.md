@@ -25,7 +25,7 @@ Desplegada en **<https://study-tracker-eight-sigma.vercel.app/>**.
 ## Stack
 
 Next.js 16 (App Router) · TypeScript · React 19 · Tailwind · Drizzle ORM · Postgres (Neon) ·
-Vitest · Vercel. shadcn/ui y Recharts entran con R3.
+Vitest · Vercel. shadcn/ui y Recharts (primitivas en `src/ui/primitives/`), instalados en `main` justo antes de R3.
 
 ## Arranque
 

@@ -210,8 +210,14 @@ alias (`ui` → `@/ui/primitives`, `utils` → `@/ui/utils`) para que las primit
 capa de presentación que ya existía, en vez de abrir una carpeta paralela que nadie documentó.
 Un `npx shadcn add <componente>` respeta esos alias sin configuración adicional.
 
-**La regla que importa:** `core/` no importa nada de `app/`, `infra/` ni `ui/`. Es la única
-regla de capas que se verifica automáticamente.
+**La regla que importa:** `core/` no importa nada de `app/`, `infra/` ni `ui/`.
+
+> **Hoy no la verifica nada automáticamente.** Este párrafo decía que era "la única regla de
+> capas que se verifica automáticamente", pero no hay regla de `eslint`, paso de `init.sh` ni
+> prueba que la compruebe. Lo detectó el agente de R4 el 25/09/2026. Ese mismo día se comprobó a
+> mano, con un `grep` de imports `@/app`, `@/infra` y `@/ui` sobre `src/core/`, que se cumple.
+> Una prueba en `src/core/` del estilo de `no-file-storage.test.ts` la volvería automática. Está
+> pendiente y registrada en `session-handoff.md`.
 
 Justificación honesta: el valor de esta separación **no** es sobrevivir a un cambio de base de
 datos — esa migración ya la eliminamos. Es poder probar la lógica de cálculo (duración

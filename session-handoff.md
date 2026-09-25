@@ -7,237 +7,126 @@
 
 ## Current Objective
 
-**Ninguno en marcha.** La sesión 9 fue **trabajo de infraestructura, no una rebanada**:
-`drizzle-kit push` quedó sustituido por migraciones versionadas. No hay ninguna feature en
-`active`, que es el estado normal cuando nadie está trabajando, y `feature_list.json` no
-cambió: este trabajo no tiene requerimiento EARS asociado porque no añade comportamiento.
-
-R2 — Cronómetro sigue en `passing`. La siguiente rebanada la elige el paso 8 del *Startup
-Workflow*: R3, R4 y R5 dependen solo de R2 y son independientes entre sí, así que califican las
-tres y se puede empezar por cualquiera. R6 es compuerta, no etapa.
+**Ninguno en marcha.** La sesión 11 ejecutó el abanico de R3, R4 y R5 en paralelo y los integró
+en `main`. No hay ninguna feature en `active`. Según el paso 8 del *Startup Workflow*, la
+siguiente es **R6 — Autenticación**: es la única `not_started` y su dependencia (R0) está en
+`passing`.
 
 ## What was done
 
-**El esquema dejó de aplicarse a mano.** Antes, `npm run db:push` aplicaba la diferencia contra
-la base a la que apuntara `.env`, sin dejar rastro de qué se aplicó ni dónde. Eso ya había roto
-producción una vez —la tabla `sessions` quedó solo en `dev`— y el procedimiento manual de
-cambiar `.env`, aplicar y devolverlo falló dos veces seguidas, porque equivocarse de base no
-produce ningún error: simplemente trabajas contra la base equivocada, en silencio.
-
-- **Migración base versionada** en `src/infra/db/migrations/0000_baseline.sql`, con su
-  `meta/_journal.json` y `meta/0000_snapshot.json`. Cubre las tres tablas, sus 34 restricciones
-  y sus seis índices, **incluido el parcial `one_running_session`**: `drizzle-kit` 0.31.11 sí lo
-  emite en `generate`, y se comprobó leyendo el `.sql`, no suponiéndolo.
-- **La migración base es idempotente a propósito.** `dev` y producción ya tenían el esquema
-  completo aplicado con `push`, es decir sin ninguna fila en la tabla de control de Drizzle: un
-  `CREATE TABLE` pelado habría fallado contra las dos. Escrita con `CREATE TABLE IF NOT EXISTS`,
-  `CREATE INDEX IF NOT EXISTS` y bloques `DO ... EXCEPTION WHEN duplicate_object` para las
-  claves foráneas, **cada base se auto-marca como migrada en su primera corrida sin tocar
-  nada**, y el mismo archivo sirve para una base vacía. La alternativa —insertar a mano el
-  registro de control— exigía SQL manual contra producción, que es justo lo que este cambio
-  elimina.
-- **Vercel aplica el esquema en el build.** El script `vercel-build` es
-  `drizzle-kit migrate && next build`. Si la migración falla, el build falla y Vercel conserva
-  el despliegue anterior. **`build` se queda en `next build` a secas** porque `./init.sh` lo
-  ejecuta: encadenar ahí las migraciones volvería la puerta de entrada dependiente de que Neon
-  responda, que es justo lo que `init.sh` evita.
-- **`db:push` ya no es el camino.** Se renombró a `db:push:emergency`. No se borró porque la
-  migración base idempotente no repara una base a medio aplicar, y esa herramienta hace falta;
-  el nombre impide usarla por inercia. Usarla se registra en `progress.md`.
-- **`init.sh` ejecuta `db:check`** —valida el historial de migraciones sin abrir conexión— y
-  **exige que existan** `db:generate`, `db:migrate` y `vercel-build`. Si `vercel-build`
-  desapareciera, el despliegue dejaría de aplicar el esquema sin que nada avisara.
-- **Documentación corregida donde contradecía la realidad**, por la excepción de alcance de
-  `AGENTS.md`: `AGENTS.md`, `README.md`, `docs/ARCHITECTURE.md` —sección nueva *El esquema
-  viaja con el despliegue* y el procedimiento de recuperación del branch `dev` caducado, que
-  seguía diciendo `db:push`—, `docs/DATA-MODEL.md`, y los comentarios de
-  `src/infra/db/schema.ts` y de la prueba de integración. Decisiones 18 a 21 registradas en la
-  tabla de `docs/ARCHITECTURE.md`.
-
-**Verificación, con la línea base tomada antes de tocar nada.** Conteos y esquema comparados
-antes y después: la única diferencia en toda la base es el esquema `drizzle` nuevo y **una**
-fila en `drizzle.__drizzle_migrations`. `programs` = 1, `session_types` = 4, `sessions` = 0 en
-los dos momentos, y el programa semilla conserva su `id` y su `created_at`. `db:migrate` se
-corrió cinco veces: no-op a partir de la primera. Sobre una base auxiliar **vacía**, las
-migraciones dejaron las mismas 34 restricciones que había dejado `push` en `dev`, comparadas
-una a una sin diferencias. `./init.sh` termina en `Init OK`; 118 pruebas de `core/` y 8 de
-integración pasan.
+- **R3 — Totales y mapa de calor, en `passing`.** Implementa RF-30 a RF-37 con funciones puras
+  en `src/core/services/study-stats.ts`. Una sesión iniciada a las 23:40 hora de Colombia cuenta
+  en su propio día.
+- **R4 — Evidencia enlazada, en `passing`.** Implementa RF-50 a RF-54: tabla `artifacts` y
+  lista blanca `http`/`https` aplicada al guardar y al presentar. RF-54 se prueba con
+  `src/core/no-file-storage.test.ts`, que recorre el código.
+- **R5 — Métricas de progreso, en `passing`.** Implementa RF-60 a RF-63: tablas `metrics` y
+  `readings`, veredicto de RF-63 en `core/` y gráfica con línea de objetivo. La semilla agrega
+  "Harness score".
+- **Infraestructura de interfaz.** shadcn/ui y Recharts quedan en `src/ui/primitives/`
+  (decisiones 22 a 24 de `docs/ARCHITECTURE.md`).
+- **Migraciones:** `0000_baseline`, `0001_artifacts` y `0002_metrics_readings`, todas
+  aplicadas en `dev`.
+- **Verificación sobre `main` integrado:**
+  - `./init.sh` termina en `Init OK`: 18 archivos y 266 pruebas.
+  - `npm run test:integration`: 4 archivos y 23 pruebas, contra `dev`.
+  - Humo con `curl`: HTTP 200 con las tres secciones nuevas.
+- **Documentación corregida** donde contradecía la realidad: `docs/DATA-MODEL.md`,
+  `docs/ARCHITECTURE.md` (la regla de capas **no** se verifica automáticamente), `README.md` y
+  el campo `verification` de R4.
+- **Medición del Experimento 2**, en la sesión 11 de `progress.md`. Ahorro neto de ~25 % en
+  tiempo de reloj y 5 conflictos, todos previstos. El costo que no mide el reloj: **tres
+  lecturas de sesiones duplicadas**.
 
 ## What is broken or unverified
 
-- **El primer despliegue con `vercel-build` todavía no se ha hecho.** El commit está hecho pero
-  **no se ha empujado**. Qué esperar cuando se empuje, paso a paso, está en *Next Session*.
-- **Defecto nuevo que introduce este modelo:** cambiar `src/infra/db/schema.ts` sin correr
-  `npm run db:generate` deja el despliegue aplicando un esquema viejo, y en local todo compila y
-  pasa. `db:check` valida la coherencia del historial pero **no** detecta la omisión. La regla
-  está en `AGENTS.md`; una guardia automática sería trabajo propio.
-- **La migración base idempotente no repara una base a medio aplicar.** Los `CHECK` y `UNIQUE`
-  declarados dentro de `CREATE TABLE IF NOT EXISTS` se saltan si la tabla ya existe; las claves
-  foráneas y los índices sí se reparan. Para eso está `db:push:emergency`.
-- **Producción sin verificar desde esta máquina.** La VPN corporativa bloquea `vercel.app` y la
-  interceptación TLS impide llegar por línea de comandos. Queda pendiente de R2: abrir el
-  despliegue desde un dispositivo fuera de la red corporativa, iniciar una sesión, cerrar el
-  navegador y ver el cronómetro corriendo con el tiempo correcto.
-- **Las sesiones guardadas todavía no se pueden ver en una lista.** `RF-30` pertenece a R3.
-- **`RF-40` se acerca.** La autenticación es compuerta, no etapa: antes del primer despliegue
-  con datos que importen, R6.
-- **Ninguna feature quedó en `status: "active"`.**
+- **Nada de esta sesión se ha empujado.** `main` va 11 commits por delante de `origin/main`,
+  que está en `dd75aee`. Ese commit ya incluye las migraciones versionadas de la sesión 9, así
+  que puede que Vercel ya haya corrido `vercel-build` con `0000_baseline`. **No se pudo
+  comprobar desde esta máquina**, porque la VPN bloquea `vercel.app`. El próximo despliegue
+  aplicará las migraciones que falten:
+  - `0000_baseline`, si todavía no se aplicó. Es idempotente y no toca nada.
+  - `0001_artifacts` y `0002_metrics_readings`, que crean tablas nuevas.
+
+  Hay que confirmar en el registro del build que aparece `migrations applied successfully`.
+- **La métrica "Harness score" no existirá en producción** hasta que se corra `db:seed` contra
+  ella. Vercel no siembra. Para hacerlo desde local sin guardar la cadena en `.env`, sigue la
+  válvula de escape de `docs/ARCHITECTURE.md`.
+- **Confirmaciones humanas pendientes (no bloquean):**
+  - **R2:** iniciar una sesión, cerrar el navegador y ver el cronómetro seguir corriendo.
+  - **R3:** ver el tablero en un navegador. El gráfico de cadencia se pinta en el cliente, así
+    que `curl` no lo muestra.
+  - **R4:** un artefacto `doc` con URL de GitHub abre el archivo real en una pestaña nueva.
+  - **R5:** cargar los scores reales de `validate-harness.mjs` y ver la curva con el objetivo
+    en 80.
+
+  La VPN corporativa bloquea `vercel.app`, así que se hacen en local o desde fuera de la red.
+- **Deuda del abanico: tres lecturas de sesiones.** R3 tiene `SessionList` /
+  `listProgramSessions`, R4 tiene `SessionEvidence` / `listRecentEvidence` y R5 tiene
+  `listLinkableSessions`. La página muestra dos listados de sesiones, el de totales y el de
+  evidencia. Consolidarlas es trabajo propio: la guía está en el commit `d002ff2`, en
+  `notas-r4.md`, sección "Guía para integrar".
+- **La regla de capas de `core/` no tiene guardia automática.** Hoy se cumple, comprobado con
+  `grep`.
 
 ## Files
 
-**Nuevos:** `src/infra/db/migrations/0000_baseline.sql`,
-`src/infra/db/migrations/meta/_journal.json`, `src/infra/db/migrations/meta/0000_snapshot.json`.
+**Nuevos en `main` esta sesión:**
+- `components.json`, `src/ui/primitives/*` y `src/ui/utils.ts`.
+- Código de R3: `study-stats`, `session-listing`, `civil-calendar`, el puerto y el repositorio
+  de historial, `stats-section`, `stats-panel`, `heatmap`, `cadence-chart` y `session-list`.
+- Código de R4: `artifact-*`, `no-file-storage.test.ts`, `evidence.ts`, `artifact-actions.ts`,
+  `session-artifacts` y `session-evidence`.
+- Código de R5: `metric-*`, `reading-*`, `metrics-snapshot.ts` y `metric-actions.ts`.
+- Las migraciones `0001_artifacts.sql` y `0002_metrics_readings.sql`, con sus snapshots.
+- Tres pruebas en `tests/integration/`.
 
-**Modificados:** `package.json` (scripts `db:generate`, `db:migrate`, `db:check`,
-`db:push:emergency`, `vercel-build`), `init.sh`, `AGENTS.md`, `README.md`,
-`docs/ARCHITECTURE.md`, `docs/DATA-MODEL.md`, `src/infra/db/schema.ts` (comentario),
-`tests/integration/session.integration.test.ts` (comentario), `progress.md` y este archivo.
+**Modificados:**
+- `package.json`, `package-lock.json`, `src/app/globals.css`, `src/app/layout.tsx` y
+  `src/app/page.tsx`.
+- `src/infra/db/schema.ts`, `src/infra/repos/drizzle-session-repository.ts` (se exporta
+  `toDomain`) y `scripts/seed.mjs`.
+- `feature_list.json` (R3, R4 y R5 en `passing`).
+- `docs/ARCHITECTURE.md`, `docs/DATA-MODEL.md`, `README.md`, `progress.md` y este archivo.
 
-`feature_list.json` **no se tocó**: esto no es una feature.
+**Retirados:** `notas-r3.md`, `notas-r4.md` y `notas-r5.md`. Están consolidados en
+`progress.md` y quedan en el historial, en `d002ff2`.
 
 ## Blockers
 
-**Ninguno.**
+**Ninguno técnico.** Hay decisiones que son del usuario:
 
-**Acción de una sola vez que depende del usuario, y no es un comando de base de datos.** No hay
-nada que ejecutar contra producción: la primera corrida de `vercel-build` crea el esquema
-`drizzle`, aplica `0000_baseline` —que no toca nada, porque el esquema ya está— y deja la base
-marcada. Lo que sí hay que hacer una vez es **confirmar en el registro del primer build de
-Vercel** que aparece `migrations applied successfully`. Si no aparece, forzar el comando de
-build en *Settings → Build and Deployment → Build Command* con `npm run vercel-build`. El
-procedimiento completo, con la válvula de escape para aplicar migraciones a producción desde la
-máquina local sin guardar la cadena en `.env`, está en `docs/ARCHITECTURE.md`.
+1. **Validar las lecturas de requerimientos que eligieron los agentes** y fijarlas en
+   `docs/REQUIREMENTS.md`:
+   - RF-34: la racha cuenta hasta ayer si hoy todavía no hay sesión.
+   - RF-35: 8 semanas de calendario, de lunes a domingo.
+   - RF-36: los últimos 28 días corridos.
+   - RF-50 y RF-52: una ruta relativa no tiene URL base y hoy se muestra como texto. ¿Se agrega
+     `repo_url` a `programs`?
+2. **Si R6 va antes de empujar.** La aplicación desplegada ya acepta escrituras sin
+   autenticación desde R1. Empujar ahora suma dos formularios públicos más, el de evidencia y el
+   de métricas. Recomendación: hacer R6 y empujar después.
+3. **Borrar en la consola de Neon los branches `dev-r3`, `dev-r4` y `dev-r5`.** Ya no se usan y
+   solo tienen datos de prueba. Los worktrees se eliminaron.
 
-**Aviso con fecha: el branch `dev` de Neon expira el 02/10/2026** (TTL de 7 días del panel). Si
-un comando de base falla con error de conexión después de esa fecha, no es el código: recrear
-el branch y correr `npm run db:migrate`, `npm run db:seed` y `npm run test:integration`. El
-procedimiento está en `docs/ARCHITECTURE.md`. El último comando no sobra: `db:migrate` es lo que
-crea el índice único, y sin él la aplicación parece sana y admite dos sesiones a la vez.
+**Aviso con fecha: el branch `dev` de Neon expira el 02/10/2026.** El procedimiento de
+recuperación está en `docs/ARCHITECTURE.md`. Ahora hay tres migraciones; `db:migrate` las
+aplica todas.
 
 ## Next Session
 
-Recommended Next Step: **abrir el abanico de R3, R4 y R5 en paralelo.**
+Recommended Next Step: **R6 — Autenticación** (RF-40 a RF-44), antes de empujar y de cargar
+datos reales.
 
-El plan completo, con su justificación y la tabla de conflictos esperados, está en
-`docs/ROADMAP.md`, sección **"Paralelización de R3, R4 y R5"**. Léelo antes de empezar: aquí va
-solo la secuencia de ejecución.
+- Auth.js con un proveedor OAuth y lista blanca por variable de entorno (`ALLOWED_EMAILS`, ya
+  documentada en `.env.example`).
+- Verificación ejecutable: `curl` sin credenciales contra una ruta de lectura y contra una
+  Server Action devuelve 401 o 403. Eso incluye las nuevas acciones de evidencia y de métricas.
+  Una prueba cubre RF-42.
+- Tras R6, empujar y vigilar el primer `vercel-build`, que aplica las tres migraciones.
 
-### Por qué aquí sí y antes no
-
-R3, R4 y R5 dependen de R2 pero no entre sí. R1 y R2 eran verticales igual que estas, pero
-encadenadas —`sessions` referencia a `programs`—, así que paralelizarlas era imposible. Vertical
-no significa independiente; solo la independencia habilita el abanico.
-
-### Paso 0 — preparación, en serie. No se reparte
-
-Si cada agente hace estos pasos por su cuenta, colisionan.
-
-1. **En `main`, instalar shadcn/ui y Recharts**, y commitear. Es infraestructura de interfaz
-   compartida: tres `shadcn init` en paralelo se pisan.
-2. **Crear en Neon tres branches desde `dev`**: `dev-r3`, `dev-r4`, `dev-r5`. Requiere la consola,
-   lo hace el usuario.
-
-   > Esto no es higiene opcional. El índice `one_running_session` es **global**: la sesión que
-   > crea la prueba de integración de un agente hace fallar las de los otros dos. Con una sola
-   > base, las pruebas fallan de forma intermitente y sin causa aparente.
-
-3. **Crear los tres worktrees:**
-
-   ```bash
-   git worktree add ../study-tracker-r3 -b r3-totales
-   git worktree add ../study-tracker-r4 -b r4-evidencia
-   git worktree add ../study-tracker-r5 -b r5-metricas
-   ```
-
-   Los worktrees comparten el `.git`, **no** los archivos sin rastrear ni `node_modules`. Cada
-   uno necesita su propio `npm install` y su propio `.env`.
-
-4. **Entrega de las cadenas de conexión — protocolo.**
-
-   **No le pidas al usuario que pegue las cadenas en la conversación.** Una credencial pegada en
-   un chat queda en el transcript sin ninguna necesidad. El intercambio es este:
-
-   1. Crea los tres worktrees y **dile al usuario las rutas exactas**.
-   2. Pídele que pegue, a mano, la cadena **pooled** de cada branch de Neon en el `.env` de su
-      worktree correspondiente:
-
-      | Worktree | Branch de Neon |
-      |---|---|
-      | `../study-tracker-r3` | `dev-r3` |
-      | `../study-tracker-r4` | `dev-r4` |
-      | `../study-tracker-r5` | `dev-r5` |
-
-   3. Cuando te diga que está listo, **verifica sin imprimir los valores**: extrae el host de
-      cada `DATABASE_URL`, comprueba que los tres son **distintos entre sí** y distintos del de
-      `dev` y del de producción. Algo así:
-
-      ```bash
-      for d in ../study-tracker-r3 ../study-tracker-r4 ../study-tracker-r5; do
-        node -e "
-          const fs=require('fs');
-          const l=fs.readFileSync('$d/.env','utf8').split(/?
-/).find(x=>x.startsWith('DATABASE_URL='));
-          console.log('$d ->', l ? new URL(l.slice(13)).host.split('.')[0] : 'FALTA');
-        "
-      done
-      ```
-
-   4. Si dos worktrees apuntan a la misma base, **detente y avisa**. Es el fallo que más caro
-      sale: el índice `one_running_session` hará que las pruebas de integración de dos agentes
-      se estorben, y el síntoma será intermitente y sin causa aparente.
-
-   `.env` está cubierto por el `.gitignore` versionado, así que queda ignorado en los tres
-   worktrees automáticamente. Verifícalo igual con `git check-ignore`.
-
-5. **`npm install` y `npm run db:migrate` en cada worktree**, para que cada base quede marcada
-   con la migración base antes de que su agente empiece.
-
-### Paso 1 — los tres agentes, en paralelo
-
-| Agente | Rebanada | Requerimientos | Worktree | Branch de Neon |
-|---|---|---|---|---|
-| A | R3 Totales y mapa de calor | `RF-30`…`RF-37` | `../study-tracker-r3` | `dev-r3` |
-| B | R4 Evidencia | `RF-50`…`RF-54` | `../study-tracker-r4` | `dev-r4` |
-| C | R5 Métricas | `RF-60`…`RF-63` | `../study-tracker-r5` | `dev-r5` |
-
-Reglas que van en el encargo de **cada** agente:
-
-- Trabaja solo en tu worktree y contra tu branch de Neon.
-- Toca **únicamente tu propia entrada** de `feature_list.json`.
-- **No reescribas `session-handoff.md`.** Es de un solo escritor. Deja tus hallazgos en
-  `notas-rN.md` en la raíz de tu worktree.
-- Monta tu interfaz en un componente propio de `src/ui/` y toca `src/app/page.tsx` lo mínimo:
-  es el archivo con más probabilidad de conflicto.
-- Commitea en tu rama. **No empujes.**
-- Sigue el resto de `AGENTS.md` como siempre, incluido el cierre de sesión.
-
-### Paso 2 — integración, en serie: R3 → R4 → R5
-
-El orden importa:
-
-1. **R3 primero**: no agrega tablas, no genera migración, no compite por la numeración.
-2. **R4 después**: genera `0001_*` para `artifacts`.
-3. **R5 al final**: también generaría `0001_*`. Tras integrar R4 ese número ya existe, así que
-   **hay que borrar su migración y regenerarla** con `npm run db:generate` para que salga
-   `0002_*`. Fusionar dos archivos `0001` corrompe el historial; `npm run db:check` lo detecta.
-
-Después de **cada** integración: `npm run db:check`, `npm run db:migrate` contra `dev`,
-`npm run test` y `npm run test:integration`.
-
-Al final, quien integra consolida las tres `notas-rN.md` en `progress.md`, reescribe este archivo
-y limpia los worktrees con `git worktree remove`.
-
-### Lo que hay que medir
-
-Este abanico es además el **Experimento 2 del Proyecto 08** del curso, hecho sobre código propio.
-Registra en `progress.md`: tiempo de preparación, tiempo de cada agente, tiempo de integración y
-número de conflictos. La pregunta a responder con datos, no con impresión: **¿el tiempo ahorrado
-compensó el costo de coordinación?**
-
-Un resultado negativo es un resultado válido y vale tanto como uno positivo.
-
-### Si prefieres no paralelizar
-
-R3, R4 y R5 en serie funcionan igual de bien y sin nada de esta coordinación. El orden sugerido
-sería R3 primero, porque hace visibles las sesiones que R2 ya guarda (`RF-30`) y porque trae la
-infraestructura de interfaz que las otras dos reutilizan.
+Candidatos pequeños para después de R6, registrados en `progress.md`:
+- consolidar las lecturas de sesiones;
+- guardia automática de capas para `core/`;
+- edición y borrado de artefactos y lecturas;
+- capturar `planned_sessions` en el formulario de programas.

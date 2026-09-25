@@ -7,9 +7,9 @@ es el esquema de Drizzle, del que `npm run db:generate` deriva las migraciones v
 una tabla nueva, genera la migración, aplícala con `npm run db:migrate` y corrige aquí lo que el
 motor rechace.
 
-Estado al 25/09/2026: `programs`, `session_types` y `sessions` están aplicadas y verificadas
-contra Neon (PostgreSQL 18.6). `artifacts` (R4), `metrics` y `readings` (R5) siguen siendo solo
-especificación.
+Estado al 25/09/2026: las seis tablas están aplicadas y verificadas contra Neon (PostgreSQL
+18.6) mediante las migraciones `0000_baseline` (`programs`, `session_types`, `sessions`),
+`0001_artifacts` (R4) y `0002_metrics_readings` (R5).
 
 ## Entidades
 
@@ -49,7 +49,9 @@ Estas reglas se imponen **en la base de datos**, no solo en la aplicación.
    nulo). El cierre debe consolidar la pausa antes de guardar.
 5. Toda marca de tiempo se almacena en UTC (`timestamptz`). La conversión a `America/Bogota`
    ocurre al presentar y al agrupar por día — nunca al almacenar.
-6. Borrar un programa borra en cascada sus sesiones, tipos, métricas y lecturas.
+6. Borrar un programa borra en cascada sus sesiones, tipos, métricas y lecturas; y, a través
+   de la cascada de `sessions`, los artefactos de esas sesiones. Descartar una sesión también
+   se lleva sus artefactos. Una lectura no se borra con su sesión: su `session_id` pasa a nulo.
 
 ## Duración efectiva
 
@@ -134,16 +136,19 @@ CREATE TABLE artifacts (
   id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   session_id uuid NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
   kind       text NOT NULL CHECK (kind IN ('doc','image','repo','link','commit')),
-  label      text NOT NULL,
-  target     text NOT NULL,
+  label      text NOT NULL CHECK (char_length(label) >= 1),
+  target     text NOT NULL CHECK (char_length(target) >= 1),
   created_at timestamptz NOT NULL DEFAULT now()
 );
+
+CREATE INDEX artifacts_by_session
+  ON artifacts (session_id, created_at);
 
 CREATE TABLE metrics (
   id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   program_id uuid NOT NULL REFERENCES programs(id) ON DELETE CASCADE,
-  name       text NOT NULL,
-  unit       text,
+  name       text NOT NULL CHECK (char_length(name) BETWEEN 1 AND 80),
+  unit       text CHECK (unit IS NULL OR char_length(unit) BETWEEN 1 AND 24),
   direction  text NOT NULL DEFAULT 'up' CHECK (direction IN ('up','down')),
   target     numeric,
   UNIQUE (program_id, name)
@@ -154,9 +159,24 @@ CREATE TABLE readings (
   metric_id   uuid        NOT NULL REFERENCES metrics(id) ON DELETE CASCADE,
   session_id  uuid        REFERENCES sessions(id) ON DELETE SET NULL,
   value       numeric     NOT NULL,
-  recorded_at timestamptz NOT NULL DEFAULT now()
+  recorded_at timestamptz NOT NULL DEFAULT now(),
+  created_at  timestamptz NOT NULL DEFAULT now()
 );
+
+CREATE INDEX readings_by_metric_time
+  ON readings (metric_id, recorded_at);
 ```
+
+> Añadidos de R4 y R5 respecto de la especificación original, todos aplicados:
+>
+> - **`artifacts`:** los `CHECK` de no vacío, porque RF-50 hace obligatorios la etiqueta y el
+>   destino y `NOT NULL` deja pasar `''`. También el índice por sesión, porque Postgres no
+>   indexa por sí solo la columna de una FK. Los topes de 120 y 2048 de `core/services` **no**
+>   se llevan al motor (decisión 17).
+> - **`metrics`:** los `CHECK` de longitud, con el mismo criterio que `session_types`.
+> - **`readings.created_at`:** desempata RF-63 cuando dos lecturas comparten `recorded_at`.
+>
+> En el esquema de Drizzle todos los `CHECK` llevan nombre explícito.
 
 > Los `CHECK` de longitud de `session_types` los fija R1: RF-15 pide "código corto" y
 > "etiqueta" sin dar un tope, y una columna `text` sin límite acepta un párrafo como código.
@@ -217,6 +237,11 @@ ORDER BY dia DESC;
 
 Agrupar por `started_at::date` sin conversión produce días equivocados para cualquier sesión
 posterior a las 19:00 hora de Colombia. Es el error silencioso más probable de todo el modelo.
+
+Esta consulta es la **referencia**, no la implementación. La agrupación se calcula en
+`src/core/services/study-stats.ts` (mismo criterio que la decisión 12 de
+`docs/ARCHITECTURE.md`), y `tests/integration/stats.integration.test.ts` comprueba que la
+consulta y `core/` dan los mismos días.
 
 ## Datos semilla
 

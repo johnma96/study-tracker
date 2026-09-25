@@ -3,12 +3,12 @@
 ## Current State
 
 **Última actualización:** 25/09/2026
-**Feature activa:** ninguna. Siguen R3, R4 y R5, previstas **en paralelo**.
-**Estado del repositorio:** R0, R1 y R2 en `passing`. Migraciones versionadas en marcha.
-Desplegado en <https://study-tracker-eight-sigma.vercel.app/>.
+**Feature activa:** ninguna.
+**Estado del repositorio:** R0 a R5 en `passing`; R3, R4 y R5 se hicieron en paralelo y ya
+están integradas en `main`. Tres migraciones (`0000` a `0002`). El despliegue en
+<https://study-tracker-eight-sigma.vercel.app/> sigue en R2: nada de esto se ha empujado.
 **Bloqueos:** ninguno. El branch `dev` de Neon **expira el 02/10/2026**.
-**Siguiente paso:** el Paso 0 de `session-handoff.md` — infraestructura de interfaz, tres
-branches de Neon y tres worktrees. En serie, no se reparte.
+**Siguiente paso:** R6 (autenticación) antes de cargar datos reales. Ver `session-handoff.md`.
 
 ---
 
@@ -702,3 +702,151 @@ Ninguno.
 **Next session**
 
 Paso 0 del handoff: preparación en serie. Después, el abanico.
+
+### Sesión 11 — 25/09/2026 — abanico de R3, R4 y R5 en paralelo (Experimento 2, Proyecto 08)
+
+**Duración:** 10:37 → ~11:25, unos 48 min de reloj de principio a fin, cierre incluido.
+**Objetivo:** ejecutar el plan de paralelización de `docs/ROADMAP.md`: preparación en serie,
+tres agentes en worktrees aislados y la integración en serie R3 → R4 → R5.
+
+**What was done**
+
+- **Paso 0, en serie:**
+  1. shadcn/ui 4.21 (base Radix) y Recharts 3.8 quedaron en `main` (commit `418c60c`), con un
+     juego base de primitivas en `src/ui/primitives/` y el `TooltipProvider` en el layout.
+  2. Se crearon tres worktrees, cada uno con su `npm ci`. El usuario creó los branches de Neon
+     `dev-r3`, `dev-r4` y `dev-r5` y pegó él mismo las cadenas en cada `.env`.
+  3. Los hosts se compararon sin imprimir las cadenas: los cuatro son distintos y todos
+     pooled.
+  4. Se corrió `db:migrate` en cada worktree.
+- **Paso 1:** tres agentes en paralelo, uno por rebanada, cada uno contra su branch de Neon.
+  Los tres cerraron en `passing` con evidencia.
+- **Paso 2, integración en serie:**
+  - **R3** se integró sin conflictos (`af8a0d5`).
+  - **R4** tuvo 1 conflicto, en `page.tsx` (`11e83bb`).
+  - **R5** tuvo 4 conflictos, en `_journal.json`, `0001_snapshot.json`, `schema.ts` y `page.tsx`
+    (`d002ff2`). Se descartó el `0001_nosy_patch` de R5 y se regeneró como
+    `0002_metrics_readings`. El SQL salió **idéntico byte a byte** al original, un segundo
+    `db:generate` respondió "No schema changes" y `db:check` pasó.
+  - Después de cada integración: `./init.sh` (que incluye `db:check`), `db:migrate` contra
+    `dev`, `test:integration` y humo con `curl`.
+  - Estado final en `main`: 18 archivos y 266 pruebas en `npm run test`, 4 archivos y 23
+    pruebas en `npm run test:integration`.
+  - `dev` quedó con 3 migraciones y 6 tablas. `db:seed` sembró la métrica "Harness score".
+  - La página responde 200 con las tres secciones nuevas.
+
+**Medición del experimento**
+
+| Fase | Inicio | Fin | Duración |
+|---|---|---|---|
+| Preparación (Paso 0) | 10:37 | 10:52 | 15 min, de los cuales ~5 fueron espera del usuario por las cadenas |
+| → shadcn + Recharts + correcciones | 10:37 | 10:45 | 7,5 min (se necesitaría igual en serie) |
+| → worktrees + 3 `npm ci` en paralelo | 10:45 | 10:46 | ~1 min |
+| → cadenas, verificación de hosts, 3 `db:migrate` | 10:46 | 10:52 | ~6 min |
+| Agente A — R3 | 10:51:45 | 11:03:37 | 12 min |
+| Agente B — R4 | 10:52:00 | 11:12:14 | 20 min |
+| Agente C — R5 | 10:52:19 | 11:07:28 | 15 min |
+| Abanico, reloj de pared | 10:52 | 11:12 | 20 min (lo marca el más lento) |
+| Integración R3 | 11:05 | 11:06 | ~1 min, 0 conflictos |
+| Integración R4 | 11:13 | 11:14 | ~1 min, 1 conflicto |
+| Integración R5 | 11:14 | 11:16 | ~2 min, 4 conflictos |
+| Cierre (notas, docs, handoff, limpieza) | 11:16 | ~11:25 | ~9 min |
+
+**Conflictos:** 5 archivos en conflicto en total. Los 5 estaban previstos en la tabla
+"Conflictos esperados" del ROADMAP y no hubo ninguno imprevisto. `feature_list.json` se fusionó
+solo, porque cada agente tocó únicamente su bloque.
+
+**¿Compensó el tiempo ahorrado el costo de coordinación?** Sí en tiempo, con una salvedad de
+diseño que no aparece en el reloj.
+
+- **Tiempo.** En serie, los tres agentes habrían sumado unos 47 min, más la instalación de
+  shadcn y el cierre. En paralelo, el abanico costó 20 min de pared. Lo que añadió la
+  coordinación fueron ~7 min de worktrees, cadenas y migraciones por branch, y ~4 min de
+  integración. **Ahorro neto: unos 15 a 20 min sobre ~65**, alrededor de un 25 %.
+- **Lo que el reloj no mide: trabajo duplicado.** Tres agentes que no se ven construyeron
+  **tres lecturas de sesiones distintas**:
+  - `SessionList` / `listProgramSessions` de R3;
+  - `SessionEvidence` / `listRecentEvidence` de R4;
+  - `listLinkableSessions` de R5.
+
+  En serie, R4 y R5 habrían reutilizado el listado de R3. El aviso que se le envió a R4 a mitad
+  de camino llegó tarde: la sección ya estaba construida. Consolidarlas es deuda que el abanico
+  creó y que habrá que pagar después. Por eso el ahorro real es menor que el medido.
+- **Costo en cómputo:** unos 640 000 tokens entre los tres subagentes. Cada uno leyó el harness
+  completo por su cuenta; en serie, esa lectura se habría hecho una sola vez.
+- **Condiciones que lo hicieron viable:** la preparación en serie absorbió los tres choques
+  estructurales (shadcn, base de datos y numeración de migraciones), y el aislamiento por branch
+  de Neon hizo que ninguna prueba de integración fallara por culpa de otro agente. Sin esas dos
+  cosas, la integración habría costado más que lo ahorrado.
+
+**Decisions**
+
+1. **Primitivas de shadcn en `src/ui/primitives/`**, no en `src/components/`. Se acepta el
+   paquete `cn` en lugar de `clsx` + `tailwind-merge`, y el modo oscuro sigue por
+   `prefers-color-scheme` (decisiones 22 a 24 de `docs/ARCHITECTURE.md`).
+2. Reglas añadidas al encargo de cada agente, además de las del ROADMAP:
+   - las tablas nuevas van en un bloque delimitado al final de `schema.ts`;
+   - la documentación no se edita en paralelo: las contradicciones se anotan en las notas y
+     las corrige quien integra;
+   - `layout.tsx`, `globals.css`, `components.json` y las primitivas están vedados;
+   - cada agente usa un puerto de humo propio (3003 a 3005), porque el usuario tenía
+     `next dev` en el 3000.
+3. En `page.tsx`, las cargas de sesión, evidencia y métricas quedan en un solo `Promise.all`,
+   porque son lecturas independientes.
+4. Decisiones de dominio de los agentes que el usuario debe validar, porque el requerimiento
+   admite otra lectura:
+   - **RF-34, racha:** si hoy no hay sesión, se cuenta hasta ayer.
+   - **RF-35, cadencia:** 8 semanas de calendario, de lunes a domingo.
+   - **RF-36, proyección:** los 28 días corridos que terminan hoy.
+   - **RF-33, mapa de calor:** umbrales fijos de 1, 30, 60 y 120 min; 26 semanas.
+   - **RF-50 y RF-52, rutas relativas:** se muestran como texto y no como enlace, porque no hay
+     una URL base de repositorio.
+5. Decisiones técnicas de los agentes, ya aplicadas:
+   - **R4:** lista blanca `http`/`https` aplicada al guardar y otra vez al presentar. RF-53 sin
+     petición del servidor a la URL, para no abrir la puerta a SSRF.
+   - **R5:** `numeric` en modo `number`, porque en modo texto RF-63 compararía `'9' > '10'`.
+     Coma decimal aceptada. `readings.created_at` desempata RF-63.
+
+**Documentación corregida** (excepción de alcance de `AGENTS.md`; todo era falso tras integrar):
+
+- `docs/DATA-MODEL.md`:
+  - el estado de las tablas;
+  - el DDL de `artifacts`, `metrics` y `readings`, para que coincida con lo aplicado;
+  - el invariante 6, al que le faltaban la cascada de artefactos y el `SET NULL` de las
+    lecturas;
+  - una nota de que la consulta de agrupación por día es referencia y no implementación.
+- `docs/ARCHITECTURE.md`: decía que la regla de capas de `core/` "se verifica
+  automáticamente", pero **nada la verifica**. Se comprobó a mano con `grep` que hoy se cumple.
+- `README.md`: cuándo entraron shadcn y Recharts.
+- `feature_list.json`, `verification` de R4: `npm run test -- artifacts` no encuentra ningún
+  archivo. R5 corrigió por su cuenta el mismo defecto en su propia entrada (`-- metrics`).
+
+**Issues**
+
+Ninguno bloqueante. Las notas originales de los agentes (`notas-r3.md`, `notas-r4.md` y
+`notas-r5.md`, con evidencia y pruebas de reversión detalladas) se consolidan aquí y se retiran
+del árbol. Quedan en el historial, en el commit `d002ff2`.
+
+**Hallazgos fuera de alcance**
+
+- **Tres lecturas de sesiones duplicadas** (ver la medición). Consolidar en una sola, colgando
+  `SessionArtifacts` de R4 del listado de R3, como propone `notas-r4.md`.
+- **RF-36 solo funciona para el programa sembrado:** el formulario de RF-10 no captura
+  `planned_sessions`.
+- **No hay edición ni borrado** de artefactos, métricas ni lecturas. Un dato mal digitado queda
+  para siempre en la curva y en el veredicto de RF-63. Es fricción real de producto.
+- **`src/ui/primitives/chart.tsx`:** su tema `.dark` nunca se activa, así que `theme.dark` en
+  `ChartConfig` no tiene efecto. R3 y R5 usan variables CSS y no se ven afectados.
+- **La regla de capas de `core/` no tiene guardia automática.** Una prueba del estilo de
+  `no-file-storage.test.ts` la cubriría.
+- **React 19 vacía los formularios tras cada envío**, también cuando el servidor rechaza. Pasa
+  en todos los formularios.
+- El encabezado de la página sigue diciendo `study-tracker · R2`.
+- Los paneles de R3 muestran todos los programas, también los `done` y `abandoned`.
+- **Operativo en Windows:** detener `npx next dev` deja vivo el proceso hijo en el puerto. R4
+  tuvo que matarlo por PID.
+- Sigue pendiente la guardia contra tocar `schema.ts` sin correr `db:generate`.
+
+**Next session**
+
+R6, antes de cargar datos reales. Detalle en `session-handoff.md`.
