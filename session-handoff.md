@@ -7,131 +7,113 @@
 
 ## Current Objective
 
-**Ninguno en marcha.** La sesión 11 ejecutó el abanico de R3, R4 y R5 en paralelo y los integró
-en `main`. No hay ninguna feature en `active`. Según el paso 8 del *Startup Workflow*, la
-siguiente es **R6 — Autenticación**: es la única `not_started` y su dependencia (R0) está en
-`passing`.
+**Ninguno en marcha.** La sesión 15 cerró **R8 — Contexto de programa** en `passing`. No hay
+ninguna feature en `active`, que es el estado normal cuando nadie está trabajando.
+
+Según el paso 8 del *Startup Workflow*, la siguiente es **R9 — Reorganización visual**: es la
+primera `not_started` cuya dependencia (R8) está en `passing`. La otra `not_started` es R6, que
+sigue diferida con riesgo aceptado y condiciones escritas en `RF-40`.
 
 ## What was done
 
-- **R3 — Totales y mapa de calor, en `passing`.** Implementa RF-30 a RF-37 con funciones puras
-  en `src/core/services/study-stats.ts`. Una sesión iniciada a las 23:40 hora de Colombia cuenta
-  en su propio día.
-- **R4 — Evidencia enlazada, en `passing`.** Implementa RF-50 a RF-54: tabla `artifacts` y
-  lista blanca `http`/`https` aplicada al guardar y al presentar. RF-54 se prueba con
-  `src/core/no-file-storage.test.ts`, que recorre el código.
-- **R5 — Métricas de progreso, en `passing`.** Implementa RF-60 a RF-63: tablas `metrics` y
-  `readings`, veredicto de RF-63 en `core/` y gráfica con línea de objetivo. La semilla agrega
-  "Harness score".
-- **Infraestructura de interfaz.** shadcn/ui y Recharts quedan en `src/ui/primitives/`
-  (decisiones 22 a 24 de `docs/ARCHITECTURE.md`).
-- **Migraciones:** `0000_baseline`, `0001_artifacts` y `0002_metrics_readings`, todas
-  aplicadas en `dev`.
-- **Verificación sobre `main` integrado:**
-  - `./init.sh` termina en `Init OK`: 18 archivos y 266 pruebas.
-  - `npm run test:integration`: 4 archivos y 23 pruebas, contra `dev`.
-  - Humo con `curl`: HTTP 200 con las tres secciones nuevas.
-- **Documentación corregida** donde contradecía la realidad: `docs/DATA-MODEL.md`,
-  `docs/ARCHITECTURE.md` (la regla de capas **no** se verifica automáticamente), `README.md` y
-  el campo `verification` de R4.
-- **Medición del Experimento 2**, en la sesión 11 de `progress.md`. Ahorro neto de ~25 % en
-  tiempo de reloj y 5 conflictos, todos previstos. El costo que no mide el reloj: **tres
-  lecturas de sesiones duplicadas**.
+- **R8 — Contexto de programa, en `passing`.** Un selector gobierna la página entera: al elegir
+  un programa, el mapa de calor, los totales, la racha, la cadencia, la proyección, las métricas
+  y la evidencia corresponden solo a ese programa. Con «todos» todo agrega.
+- **El estado vive en la URL** (`/?programa=<id>`, con `todos` por defecto), no en estado de
+  cliente. En Next 16 `searchParams` es una **promesa** y hay que esperarla; `PageProps<'/'>` la
+  tipa sin importar nada, porque la genera `next typegen`.
+- **El selector son enlaces**, no un `onChange`: funciona sin JavaScript, entra en el historial
+  del navegador y el enlace se puede compartir.
+- **Un valor inexistente o malformado en `?programa=` cae en «todos» sin error** (RF-39).
+  Comprobado con `no-existe-123` y con `' OR 1=1 --` codificado: HTTP 200 las dos veces.
+- **El filtrado tiene un solo dueño:** `src/core/services/program-context.ts`, funciones puras
+  probadas sin base de datos. `listProgramSessions` pasó a ser `listSessionsInContext` para no
+  dejar la misma regla escrita en dos sitios.
+- **`RF-38` y `RF-39` nuevos** en `docs/REQUIREMENTS.md`, y decisiones 25 y 26 en
+  `docs/ARCHITECTURE.md`. No existía ningún requerimiento EARS que describiera el contexto ni el
+  valor inválido, y la *Definition of Done* exige citar uno.
+
+## Verification
+
+- `npm run test`: **304 pruebas en 19 archivos** (antes 281 en 18).
+- **Reversión comprobada ejecutándola, no por suposición.** Con `filterByProgramContext`
+  devolviendo siempre la lista completa caen **5 pruebas en 2 archivos**; al restaurar el filtro
+  vuelven 304/304.
+- `npm run test:integration`: **26/26** contra el branch `dev` de Neon.
+- `npm run check`, `npm run lint` y `npm run build` sin errores. `./init.sh` termina en `Init OK`.
+- Humo con `curl` contra el servidor local y los datos reales de `dev`: con «todos» el tablero
+  dice «Todos los programas» con 3 sesiones; con `Harness Engineering` el tablero es suyo y sale
+  en estado vacío, porque las tres sesiones son de `Prueba R7` y **no cuentan para él**; con
+  `Prueba R7` salen sus tres.
 
 ## What is broken or unverified
 
-- **Nada de esta sesión se ha empujado.** `main` va 11 commits por delante de `origin/main`,
-  que está en `dd75aee`. Ese commit ya incluye las migraciones versionadas de la sesión 9, así
-  que puede que Vercel ya haya corrido `vercel-build` con `0000_baseline`. **No se pudo
-  comprobar desde esta máquina**, porque la VPN bloquea `vercel.app`. El próximo despliegue
-  aplicará las migraciones que falten:
-  - `0000_baseline`, si todavía no se aplicó. Es idempotente y no toca nada.
-  - `0001_artifacts` y `0002_metrics_readings`, que crean tablas nuevas.
-
-  Hay que confirmar en el registro del build que aparece `migrations applied successfully`.
-- **La métrica "Harness score" no existirá en producción** hasta que se corra `db:seed` contra
-  ella. Vercel no siembra. Para hacerlo desde local sin guardar la cadena en `.env`, sigue la
-  válvula de escape de `docs/ARCHITECTURE.md`.
-- **Confirmaciones humanas pendientes (no bloquean):**
-  - **R2:** iniciar una sesión, cerrar el navegador y ver el cronómetro seguir corriendo.
-  - **R3:** ver el tablero en un navegador. El gráfico de cadencia se pinta en el cliente, así
-    que `curl` no lo muestra.
-  - **R4:** un artefacto `doc` con URL de GitHub abre el archivo real en una pestaña nueva.
-  - **R5:** cargar los scores reales de `validate-harness.mjs` y ver la curva con el objetivo
-    en 80.
-
-  La VPN corporativa bloquea `vercel.app`, así que se hacen en local o desde fuera de la red.
-- **Deuda del abanico: tres lecturas de sesiones.** R3 tiene `SessionList` /
-  `listProgramSessions`, R4 tiene `SessionEvidence` / `listRecentEvidence` y R5 tiene
-  `listLinkableSessions`. La página muestra dos listados de sesiones, el de totales y el de
-  evidencia. Consolidarlas es trabajo propio: la guía está en el commit `d002ff2`, en
-  `notas-r4.md`, sección "Guía para integrar".
-- **La regla de capas de `core/` no tiene guardia automática.** Hoy se cumple, comprobado con
-  `grep`.
+- **Nada de esto se ha empujado.** `main` sigue por delante de `origin/main`. El próximo `git
+  push` llevará a producción las migraciones pendientes por `vercel-build`; en el registro del
+  build debe aparecer `migrations applied successfully`.
+- **Sin verificar en producción.** La VPN corporativa bloquea `vercel.app`. Todo se verificó en
+  local contra el branch `dev` de Neon.
+- **Confirmación humana de R8 pendiente (no bloquea):** abrir la página en un navegador, elegir
+  un programa y comprobar que el mapa, los totales, las métricas y la evidencia cambian, que la
+  URL refleja la selección y que recargar la conserva.
+- **Las `key` por contexto no tienen prueba automatizada.** Los tres componentes que alternan
+  según el programa llevan `key` y un comentario que explica por qué, pero no hay entorno de
+  pruebas de componentes React, así que quitarlas no rompe nada en la suite. Es la misma deuda
+  que dejó la sesión 14 con el defecto de «Pausar»/«Reanudar».
+- **Quedó un `next dev` vivo en el puerto 3000** (PID 26240 durante esta sesión), de una sesión
+  anterior. En Windows detener `next dev` deja el proceso hijo escuchando; si el puerto está
+  ocupado, `taskkill /PID <pid> /F`.
 
 ## Files
 
-**Nuevos en `main` esta sesión:**
-- `components.json`, `src/ui/primitives/*` y `src/ui/utils.ts`.
-- Código de R3: `study-stats`, `session-listing`, `civil-calendar`, el puerto y el repositorio
-  de historial, `stats-section`, `stats-panel`, `heatmap`, `cadence-chart` y `session-list`.
-- Código de R4: `artifact-*`, `no-file-storage.test.ts`, `evidence.ts`, `artifact-actions.ts`,
-  `session-artifacts` y `session-evidence`.
-- Código de R5: `metric-*`, `reading-*`, `metrics-snapshot.ts` y `metric-actions.ts`.
-- Las migraciones `0001_artifacts.sql` y `0002_metrics_readings.sql`, con sus snapshots.
-- Tres pruebas en `tests/integration/`.
+**Nuevos:**
+- `src/core/services/program-context.ts` y `src/core/services/program-context.test.ts`.
+- `src/ui/program-selector.tsx`.
 
 **Modificados:**
-- `package.json`, `package-lock.json`, `src/app/globals.css`, `src/app/layout.tsx` y
-  `src/app/page.tsx`.
-- `src/infra/db/schema.ts`, `src/infra/repos/drizzle-session-repository.ts` (se exporta
-  `toDomain`) y `scripts/seed.mjs`.
-- `feature_list.json` (R3, R4 y R5 en `passing`).
-- `docs/ARCHITECTURE.md`, `docs/DATA-MODEL.md`, `README.md`, `progress.md` y este archivo.
+- `src/app/page.tsx` — lee `searchParams`, resuelve el contexto y lo baja a cada sección.
+- `src/app/stats-section.tsx` — un tablero, el del contexto, en vez de uno por programa.
+- `src/app/evidence.ts` — lee una ventana de 50 sesiones y muestra 10 tras filtrar.
+- `src/core/services/session-listing.ts` y su prueba — `listSessionsInContext`.
+- `src/ui/stats-panel.tsx` — la prop `programName` pasó a `title`.
+- `src/ui/start-session-form.tsx`, `src/ui/manual-session-form.tsx` — preselección por contexto.
+- `src/ui/session-evidence.tsx` — texto del estado vacío.
+- `tests/integration/stats.integration.test.ts` — usa el contexto.
+- `docs/REQUIREMENTS.md`, `docs/ARCHITECTURE.md`, `feature_list.json`, `progress.md` y este
+  archivo.
 
-**Retirados:** `notas-r3.md`, `notas-r4.md` y `notas-r5.md`. Están consolidados en
-`progress.md` y quedan en el historial, en `d002ff2`.
+**Sin tocar:** el esquema de la base. R8 no cambió `src/infra/db/schema.ts`, así que no hay
+migración nueva.
 
 ## Blockers
 
-**Ninguno técnico.** Hay decisiones que son del usuario:
+**Ninguno técnico.** Decisiones que son del usuario:
 
-1. **Validar las lecturas de requerimientos que eligieron los agentes** y fijarlas en
-   `docs/REQUIREMENTS.md`:
-   - RF-34: la racha cuenta hasta ayer si hoy todavía no hay sesión.
-   - RF-35: 8 semanas de calendario, de lunes a domingo.
-   - RF-36: los últimos 28 días corridos.
-   - RF-50 y RF-52: una ruta relativa no tiene URL base y hoy se muestra como texto. ¿Se agrega
-     `repo_url` a `programs`?
-2. **Si R6 va antes de empujar.** La aplicación desplegada ya acepta escrituras sin
-   autenticación desde R1. Empujar ahora suma dos formularios públicos más, el de evidencia y el
-   de métricas. Recomendación: hacer R6 y empujar después.
-3. **Borrar en la consola de Neon los branches `dev-r3`, `dev-r4` y `dev-r5`.** Ya no se usan y
-   solo tienen datos de prueba. Los worktrees se eliminaron.
+1. **Si la administración de programas debía filtrarse también por el contexto.** Se decidió que
+   **no**: `docs/ROADMAP.md` enumera qué recorta R8 —mapa, totales, métricas y evidencia— y ese
+   listado no está en la lista, y además es el único sitio donde se ven todos. Si la intención
+   era la contraria, es un cambio de una línea en `page.tsx`.
+2. **Validar `RF-38` y `RF-39` tal como quedaron escritos.** Los redactó esta sesión para que R8
+   pudiera citar un requerimiento, siguiendo lo que ya decía el ROADMAP.
+3. **Si R6 va antes de empujar.** La aplicación desplegada sigue aceptando escrituras sin
+   autenticación.
+4. **Borrar en la consola de Neon los branches `dev-r3`, `dev-r4` y `dev-r5`**, si siguen ahí.
 
 **Aviso con fecha: el branch `dev` de Neon expira el 02/10/2026.** El procedimiento de
-recuperación está en `docs/ARCHITECTURE.md`. Ahora hay tres migraciones; `db:migrate` las
-aplica todas.
+recuperación está en `docs/ARCHITECTURE.md`. Si un comando de base falla por conexión, no es el
+código.
 
 ## Next Session
 
-**El MVP está completo salvo la autenticación.** R0 a R5 y R7 en `passing`; R6 diferida con
-riesgo aceptado y condiciones escritas en `RF-40`.
+**R9 — Reorganización visual.** Está planificada en `docs/ROADMAP.md` y es exactamente lo que R8
+tenía prohibido tocar:
 
-Recommended Next Step: **el curso de harness engineering**. El tracker ya puede registrar su
-propia primera sesión: cronometra, guarda, muestra totales y evidencia, y grafica métricas.
+- Jerarquía: barra de sesión y selector arriba; luego acción; luego avance; métricas; evidencia;
+  y **administración de programas al final**.
+- **Dos columnas en escritorio, una en móvil.** `max-w-2xl` pasa a `max-w-6xl`. La degradación a
+  una columna no es opcional: la verificación de producción se hace desde el teléfono.
+- **Selector de sesión en la evidencia**: un desplegable con las sesiones del programa y debajo
+  solo los artefactos de esa sesión más el formulario. Desaparecen las N tarjetas.
 
-Antes de la próxima sesión de trabajo, dos cosas de mantenimiento:
-
-1. **Confirmar el despliegue.** El próximo `git push` lleva la migración `0003` a producción por
-   `vercel-build`. En el registro del build debe aparecer `migrations applied successfully`.
-2. **El branch `dev` de Neon expira el 02/10/2026.** Procedimiento de recuperación en
-   `docs/ARCHITECTURE.md`.
-
-Si se retoma el producto en vez del curso, la deuda pendiente, por orden de valor:
-
-- **Indicar en la tabla de R3 qué sesiones tienen evidencia.** Es la mejora natural tras R7, pero
-  acopla la sección de R3 al repositorio de R4: cuatro archivos y una consulta nueva.
-- `plannedSessions` no se captura por la interfaz y `RF-36` lo necesita para proyectar.
-- No hay edición ni borrado de programas ni de sesiones.
-- **R6**, si se cumple alguna de las cuatro condiciones de `RF-40`.
+Recommended Next Step: R9, o el curso de harness engineering. El tracker ya puede registrar su
+propia sesión y ahora, con el contexto, separar el curso de cualquier otro programa.

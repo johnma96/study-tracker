@@ -2,12 +2,16 @@ import { describe, expect, it } from 'vitest';
 
 import type { Session } from '../model/session';
 
-import { listProgramSessions } from './session-listing';
+import { ALL_PROGRAMS_CONTEXT, type ProgramContext } from './program-context';
+import { listSessionsInContext } from './session-listing';
 
-/** RF-30 — listado de sesiones de un programa, sin base de datos. */
+/** RF-30 — listado de sesiones del contexto de programa, sin base de datos. */
 
 const PROGRAM = 'programa-a';
 const OTHER = 'programa-b';
+
+/** R8 — el listado se recorta por contexto, no por un identificador suelto. */
+const CONTEXT: ProgramContext = { kind: 'program', programId: PROGRAM };
 
 function session(overrides: Partial<Session> & Pick<Session, 'id' | 'startedAt'>): Session {
   return {
@@ -40,7 +44,7 @@ describe('RF-30 — listado de sesiones', () => {
   ];
 
   it('solo trae las del programa, ordenadas por inicio descendente', () => {
-    expect(listProgramSessions(sesiones, PROGRAM).map((item) => item.id)).toEqual([
+    expect(listSessionsInContext(sesiones, CONTEXT).map((item) => item.id)).toEqual([
       'r',
       'c',
       'a',
@@ -48,8 +52,19 @@ describe('RF-30 — listado de sesiones', () => {
     ]);
   });
 
+  /** R8 — con «todos» el listado no recorta: entra también la del otro programa. */
+  it('con el contexto «todos» entran las sesiones de todos los programas', () => {
+    expect(listSessionsInContext(sesiones, ALL_PROGRAMS_CONTEXT).map((item) => item.id)).toEqual([
+      'r',
+      'c',
+      'x',
+      'a',
+      'b',
+    ]);
+  });
+
   it('muestra fecha y hora de Colombia, tipo, duración efectiva y nota', () => {
-    const [enCurso, nocturna, conOverride, conNota] = listProgramSessions(sesiones, PROGRAM);
+    const [enCurso, nocturna, conOverride, conNota] = listSessionsInContext(sesiones, CONTEXT);
 
     // 23:40 del 24 en Colombia; en UTC ya es el 25.
     expect(nocturna).toEqual({
@@ -69,9 +84,9 @@ describe('RF-30 — listado de sesiones', () => {
 
   it('los empates de inicio se resuelven por identificador, de forma estable', () => {
     const mismoInicio = new Date('2026-09-24T08:00:00-05:00');
-    const lista = listProgramSessions(
+    const lista = listSessionsInContext(
       [session({ id: 'z', startedAt: mismoInicio }), session({ id: 'm', startedAt: mismoInicio })],
-      PROGRAM,
+      CONTEXT,
     );
 
     expect(lista.map((item) => item.id)).toEqual(['m', 'z']);

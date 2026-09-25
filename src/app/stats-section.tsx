@@ -1,7 +1,12 @@
 import type { Program } from '@/core/model/program';
 import type { Session } from '@/core/model/session';
 import type { SessionType } from '@/core/model/session-type';
-import { listProgramSessions } from '@/core/services/session-listing';
+import {
+  filterByProgramContext,
+  plannedSessionsInContext,
+  type ProgramContext,
+} from '@/core/services/program-context';
+import { listSessionsInContext } from '@/core/services/session-listing';
 import { buildProgramStats } from '@/core/services/study-stats';
 import { toCivilDateInAppZone } from '@/core/services/timezone';
 import { drizzleSessionHistoryRepository } from '@/infra/repos/drizzle-session-history-repository';
@@ -19,15 +24,31 @@ import { StatsPanel } from '@/ui/stats-panel';
  * se consultan dos veces. `nowIso` es el reloj del motor (decisión 16 de
  * docs/ARCHITECTURE.md); de él sale el "hoy" de Colombia contra el que se mide
  * la racha, la cadencia y la proyección (RF-00).
+ *
+ * **R8 — un tablero, el del contexto.** Antes se pintaba un tablero por
+ * programa. Ahora manda el contexto: con «todos» se suman las sesiones de todos
+ * los programas —el mapa responde «qué días trabajé, en lo que sea»— y con un
+ * programa elegido se ve solo el suyo. La decisión y su motivo están en
+ * `docs/ROADMAP.md`: un mapa pequeño por programa informa más, pero se vuelve
+ * ilegible en cuanto hay varios.
+ *
+ * El recorte lo hace `core/services/program-context.ts`, no una consulta: así
+ * la regla se prueba sin base de datos, que es lo que exige la *Definition of
+ * Done*.
  */
 export async function StatsSection({
   programs,
   sessionTypes,
   nowIso,
+  context,
+  title,
 }: {
   programs: readonly Program[];
   sessionTypes: readonly SessionType[];
   nowIso: string;
+  context: ProgramContext;
+  /** Nombre del contexto: el del programa elegido, o «Todos los programas». */
+  title: string;
 }) {
   let sessions: Session[] = [];
   let failed = false;
@@ -44,6 +65,9 @@ export async function StatsSection({
   const typeLabels = new Map(
     sessionTypes.map((sessionType) => [sessionType.id, `${sessionType.code} · ${sessionType.label}`]),
   );
+
+  // R8 — todo lo que sigue se calcula sobre las sesiones del contexto.
+  const scoped = filterByProgramContext(sessions, context);
 
   return (
     <section className="flex flex-col gap-4" aria-labelledby="stats-heading">
@@ -62,19 +86,23 @@ export async function StatsSection({
           No se pudo leer el historial de sesiones.
         </p>
       ) : (
-        programs.map((program) => {
-          const own = sessions.filter((session) => session.programId === program.id);
-
-          return (
-            <StatsPanel
-              key={program.id}
-              programName={program.name}
-              stats={buildProgramStats(own, { today, plannedSessions: program.plannedSessions })}
-              sessions={listProgramSessions(own, program.id)}
-              typeLabels={typeLabels}
-            />
-          );
-        })
+        <StatsPanel
+          /*
+            R8 — la `key` cambia con el contexto a propósito. El tablero monta
+            componentes de cliente con estado propio —la gráfica de cadencia— y
+            sin `key` React reutiliza la instancia al cambiar de programa. Es
+            exactamente el defecto de los botones «Pausar» y «Reanudar» de R7:
+            misma posición, misma instancia, estado viejo.
+          */
+          key={context.kind === 'all' ? 'todos' : context.programId}
+          title={title}
+          stats={buildProgramStats(scoped, {
+            today,
+            plannedSessions: plannedSessionsInContext(programs, context),
+          })}
+          sessions={listSessionsInContext(scoped, context)}
+          typeLabels={typeLabels}
+        />
       )}
     </section>
   );

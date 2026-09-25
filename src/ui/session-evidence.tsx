@@ -72,7 +72,8 @@ export function SessionEvidence({
         </p>
       ) : items.length === 0 ? (
         <p className="rounded-lg border border-border p-4 text-sm opacity-80">
-          Todavía no hay sesiones. Cuando registres la primera, aquí podrás adjuntarle evidencia.
+          Todavía no hay sesiones que mostrar aquí. Cuando registres la primera, podrás
+          adjuntarle evidencia.
         </p>
       ) : (
         items.map((item) => {

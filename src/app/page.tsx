@@ -4,18 +4,26 @@ import { loadMetricsSnapshot } from '@/app/metrics-snapshot';
 import { StatsSection } from '@/app/stats-section';
 import type { Program } from '@/core/model/program';
 import type { SessionType } from '@/core/model/session-type';
+import {
+  filterByProgramContext,
+  PROGRAM_PARAM,
+  programsInContext,
+  resolveProgramContext,
+  selectedProgramId,
+} from '@/core/services/program-context';
 import { toCivilDateInAppZone, toCivilTimeInAppZone } from '@/core/services/timezone';
 import { drizzleProgramRepository } from '@/infra/repos/drizzle-program-repository';
 import { ManualSessionForm } from '@/ui/manual-session-form';
 import { MetricsSection } from '@/ui/metrics-section';
 import { ProgramCard } from '@/ui/program-card';
 import { ProgramForm } from '@/ui/program-form';
+import { ProgramSelector } from '@/ui/program-selector';
 import { SessionEvidence } from '@/ui/session-evidence';
 import { StartSessionForm } from '@/ui/start-session-form';
 import { StopSessionForm } from '@/ui/stop-session-form';
 
 /**
- * R1 — Programas. R2 — Cronómetro.
+ * R1 — Programas. R2 — Cronómetro. R8 — contexto de programa.
  *
  * Server Component que lee de Postgres a través de los repositorios: crear
  * (RF-10) y listar (RF-13) programas con sus tipos de sesión (RF-15), e iniciar
@@ -40,7 +48,18 @@ function groupByProgram(sessionTypes: readonly SessionType[]): Map<string, Sessi
   return grouped;
 }
 
-export default async function Home() {
+/**
+ * R8 — el contexto de programa viaja en `?programa=<id>`.
+ *
+ * **En Next 16 `searchParams` es una promesa** y hay que esperarla; no es el
+ * objeto plano de las versiones anteriores. Leerla ata la página a la
+ * solicitud, que es justo lo que se quiere aquí. `PageProps<'/'>` la tipa sin
+ * necesidad de importar nada: lo genera `next typegen`, que `npm run check`
+ * ejecuta antes de `tsc`.
+ */
+export default async function Home(props: PageProps<'/'>) {
+  const searchParams = await props.searchParams;
+
   let programs: Program[] = [];
   let sessionTypes: SessionType[] = [];
   let error: string | null = null;
@@ -56,11 +75,22 @@ export default async function Home() {
     error = 'No se pudo leer de la base de datos.';
   }
 
+  // El contexto se valida contra los programas que existen de verdad: un
+  // identificador inventado, borrado o directamente hostil cae en «todos» y la
+  // página se pinta igual (R8).
+  const context = resolveProgramContext(searchParams[PROGRAM_PARAM], programs);
+  const contextPrograms = programsInContext(programs, context);
+  const contextTitle =
+    context.kind === 'all'
+      ? 'Todos los programas'
+      : (contextPrograms[0]?.name ?? 'Todos los programas');
+  const contextProgramId = selectedProgramId(context);
+
   // Lecturas independientes entre sí: sesión en curso, evidencia de las sesiones
   // recientes (R4, RF-50 a RF-53) y métricas de progreso (R5, RF-60 a RF-63).
   const [snapshot, evidence, metricsSnapshot] = await Promise.all([
     loadSessionSnapshot(),
-    loadRecentEvidence(),
+    loadRecentEvidence(context),
     loadMetricsSnapshot(),
   ]);
   const running = snapshot.running;
@@ -100,6 +130,12 @@ export default async function Home() {
         </section>
       ) : (
         <>
+          {/*
+            R8 — el selector gobierna todo lo que sigue. Va arriba porque es el
+            contexto de lectura de la página, no una opción más.
+          */}
+          {programs.length > 0 ? <ProgramSelector programs={programs} context={context} /> : null}
+
           <section className="rounded-lg border border-black/10 p-6 dark:border-white/15">
             {running ? (
               <>
@@ -122,9 +158,20 @@ export default async function Home() {
                   este formulario.
                 </p>
                 <StartSessionForm
+                  /*
+                    R8 — la `key` depende del contexto, y quitarla reintroduce un
+                    defecto conocido. Es un componente de cliente cuyo `useState`
+                    inicial fija el programa elegido: sin `key`, al navegar a
+                    otro programa React reutiliza la instancia, el valor inicial
+                    no se vuelve a evaluar y el selector se queda en el programa
+                    anterior. Es la misma trampa que el par «Pausar»/«Reanudar»
+                    de R7.
+                  */
+                  key={`start-${contextProgramId ?? 'todos'}`}
                   programs={programs}
                   sessionTypes={sessionTypes}
                   hasRunningSession={false}
+                  selectedProgramId={contextProgramId}
                 />
               </>
             )}
@@ -136,13 +183,21 @@ export default async function Home() {
               Para lo que ya ocurrió y no se cronometró. La hora es de Colombia.
             </p>
             <ManualSessionForm
+              key={`manual-${contextProgramId ?? 'todos'}`}
               programs={programs}
               sessionTypes={sessionTypes}
               todayInAppZone={today}
+              selectedProgramId={contextProgramId}
             />
           </section>
 
-          <StatsSection programs={programs} sessionTypes={sessionTypes} nowIso={snapshot.nowIso} />
+          <StatsSection
+            programs={programs}
+            sessionTypes={sessionTypes}
+            nowIso={snapshot.nowIso}
+            context={context}
+            title={contextTitle}
+          />
 
           <SessionEvidence
             items={evidence.items}
@@ -159,6 +214,13 @@ export default async function Home() {
             <ProgramForm />
           </section>
 
+          {/*
+            La administración de programas **no** se recorta por el contexto, a
+            propósito: es el único sitio donde se ven todos, y esconder los demás
+            al elegir uno dejaría sin superficie de administración a los que no
+            están seleccionados. `docs/ROADMAP.md` enumera qué filtra R8 —mapa,
+            totales, métricas y evidencia— y este listado no está en la lista.
+          */}
           <section className="flex flex-col gap-4">
             <h2 className="text-xl font-semibold">
               {programs.length} programa{programs.length === 1 ? '' : 's'}
@@ -180,11 +242,11 @@ export default async function Home() {
             )}
           </section>
 
-          {/* R5 — métricas de progreso (RF-60 a RF-63). */}
+          {/* R5 — métricas de progreso (RF-60 a RF-63), recortadas por el contexto de R8. */}
           <MetricsSection
-            programs={programs}
-            metrics={metricsSnapshot.metrics}
-            sessionOptions={metricsSnapshot.sessionOptions}
+            programs={contextPrograms}
+            metrics={filterByProgramContext(metricsSnapshot.metrics, context)}
+            sessionOptions={filterByProgramContext(metricsSnapshot.sessionOptions, context)}
             unavailable={metricsSnapshot.unavailable}
             todayInAppZone={today}
             nowTimeInAppZone={toCivilTimeInAppZone(new Date(snapshot.nowIso))}

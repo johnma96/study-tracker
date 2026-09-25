@@ -16,23 +16,33 @@ import { EMPTY_SESSION_ACTION_STATE } from '@/ui/session-form-state';
  * cinco horas movida, y con ella el día en que cuenta.
  *
  * Esta sesión nace cerrada, así que no choca con el índice `one_running_session`:
- * se puede anotar la sesión de ayer aunque ahora mismo haya otra corriendo.
+ * se puede anotar la sesión de ayer aunque ahora mismo haya otra corriendo. *
+ * R8 — el programa llega preseleccionado desde el contexto de la URL. Sigue
+ * siendo un selector completo: con «todos» no hay nada que preseleccionar y
+ * con un programa elegido el formulario ya viene apuntando ahí, pero se puede
+ * cambiar. Quien monta este formulario le pone una `key` que depende del
+ * contexto: sin ella React conserva la instancia al navegar y el estado inicial
+ * de `useState` no se vuelve a evaluar, así que el selector se quedaría en el
+ * programa anterior.
  */
 export function ManualSessionForm({
   programs,
   sessionTypes,
   todayInAppZone,
+  selectedProgramId,
 }: {
   programs: readonly Program[];
   sessionTypes: readonly SessionType[];
   /** Fecha de hoy en `America/Bogota`, calculada en el servidor. */
   todayInAppZone: string;
+  /** R8 — programa del contexto, o `null` con «todos». */
+  selectedProgramId: string | null;
 }) {
   const [state, formAction, pending] = useActionState(
     createManualSessionAction,
     EMPTY_SESSION_ACTION_STATE,
   );
-  const [programId, setProgramId] = useState(programs[0]?.id ?? '');
+  const [programId, setProgramId] = useState(selectedProgramId ?? programs[0]?.id ?? '');
 
   const inputClass =
     'w-full rounded-md border border-black/15 bg-transparent px-3 py-2 text-sm dark:border-white/20';

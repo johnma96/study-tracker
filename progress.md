@@ -4,10 +4,10 @@
 
 **Última actualización:** 25/09/2026
 **Feature activa:** ninguna.
-**Estado del repositorio:** R0 a R5 y R7 en `passing`. **R6 diferida con riesgo aceptado**
+**Estado del repositorio:** R0 a R5, R7 y R8 en `passing`. **R6 diferida con riesgo aceptado**
 (ver `RF-40`). Desplegado en <https://study-tracker-eight-sigma.vercel.app/>.
 **Bloqueos:** ninguno. El branch `dev` de Neon **expira el 02/10/2026**.
-**Siguiente paso:** el curso. El MVP está completo salvo autenticación.
+**Siguiente paso:** R9 — reorganización visual, que depende de R8 y ya está en `not_started`.
 
 ---
 
@@ -1021,3 +1021,78 @@ estado en el navegador.
 **Next session**
 
 El curso.
+
+---
+
+### Sesión 15 — 25/09/2026 — R8, contexto de programa
+
+**Duración:** ~70 min
+**Objetivo:** que un selector de programa gobierne la página entera, con el estado en la URL.
+
+**What was done**
+
+1. **`core/services/program-context.ts`, dueño único del filtrado.** Resuelve el parámetro
+   `?programa=` contra los programas que existen y recorta sesiones, métricas, opciones de
+   sesión y evidencia. Funciones puras, 22 pruebas, sin base de datos.
+2. **El estado vive en la URL.** `searchParams` se lee en `page.tsx` —en Next 16 es una
+   **promesa**, hay que esperarla— y de ahí baja como `ProgramContext` a cada sección. No hay
+   estado de cliente en ninguna parte del contexto.
+3. **El selector son enlaces**, no un `onChange`. Cambiar de programa *es* navegar: entra en el
+   historial, el enlace se puede compartir y funciona sin JavaScript, igual que
+   `SessionActionButton`.
+4. **Un tablero, el del contexto.** `StatsSection` pasó de pintar un tablero por programa a
+   pintar el del contexto: con «todos» suma las sesiones de todos los programas —mapa, totales,
+   racha, cadencia y proyección—; con uno elegido, solo el suyo.
+5. **Métricas y evidencia filtradas**, y el cronómetro y el registro manual preseleccionando el
+   programa del contexto.
+6. **`RF-38` y `RF-39` nuevos** en `docs/REQUIREMENTS.md`: no existía ningún requerimiento EARS
+   que describiera el contexto ni el valor inválido, y la *Definition of Done* exige citar uno.
+
+**Decisions**
+
+1. **`listProgramSessions` pasó a ser `listSessionsInContext`**, en vez de dejar el filtro por
+   programa en dos sitios. El listado y los totales tienen que coincidir en qué sesiones entran;
+   dos definiciones de la misma regla se desincronizan, que es el defecto que ya apareció con
+   `repo_url` y con el CHECK de `0003`.
+2. **Un valor desconocido se valida por pertenencia, no por forma.** Comprobar que «parece un
+   UUID» aceptaría identificadores inexistentes y obligaría a un caso de error más abajo;
+   comparar contra los programas que existen resuelve las dos cosas y no deja ninguna cadena del
+   usuario llegando a una consulta.
+3. **Con «todos», `plannedSessions` se suma** (RF-36). Si ninguno declara plan el resultado es
+   `null` y no cero: «no hay plan» y «el plan es cero» llevan a proyecciones distintas.
+4. **La evidencia lee una ventana de 50 sesiones y muestra 10 tras filtrar.** Leer solo diez y
+   filtrar después dejaría vacío un programa que sí tiene evidencia, solo porque las diez más
+   recientes son de otro.
+5. **La administración de programas no se filtra.** `docs/ROADMAP.md` enumera qué recorta R8
+   —mapa, totales, métricas y evidencia— y ese listado no está. Además es el único sitio donde
+   se ven todos; esconderlos al elegir uno dejaría sin superficie de administración al resto.
+6. **`key` por contexto en los tres componentes que alternan.** Es el defecto de R7 —«Pausar» y
+   «Reanudar» compartiendo posición sin `key`— aplicado aquí: el `useState` inicial de los
+   formularios fija el programa, y sin `key` React reutiliza la instancia al navegar y el
+   selector se queda en el programa anterior.
+
+**Issues**
+
+Ninguno abierto. La reversión se comprobó ejecutándola: con `filterByProgramContext` devolviendo
+siempre la lista completa caen 5 pruebas en 2 archivos, y al restaurarla vuelven 304/304.
+
+Durante el trabajo, dos tropiezos de herramienta propios, no del código: un heredoc de bash con
+backticks dentro se rompió al interpretarlos como sustitución de comando, y los documentos en
+`docs/` tienen CRLF mientras `.gitattributes` declara LF, así que las ediciones por script
+fallaban en silencio hasta normalizar los saltos de línea.
+
+**Hallazgos fuera de alcance**
+
+- **`docs/ROADMAP.md` no dice qué pasa con la administración de programas en R8.** Se decidió no
+  filtrarla; si la intención era otra, es un cambio de una línea.
+- **El defecto de reconciliación de React sigue sin prueba automatizada.** No hay entorno de
+  pruebas de componentes; las `key` de esta sesión se justifican con comentarios, no con una
+  prueba que falle al quitarlas. Es la misma deuda que dejó la sesión 14.
+- Sigue sin existir edición ni borrado de programas ni de sesiones.
+- `plannedSessions` sigue sin capturarse por la interfaz, así que la proyección de `RF-36` no se
+  ve con datos reales ni con un programa ni con «todos».
+- La regla de capas de `core/` sigue sin guardia automática.
+
+**Next session**
+
+R9 — reorganización visual. Es la única `not_started` cuyas dependencias están en `passing`.

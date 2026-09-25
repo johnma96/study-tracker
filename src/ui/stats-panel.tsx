@@ -50,12 +50,13 @@ function projectionText(projection: Projection): string {
 }
 
 export function StatsPanel({
-  programName,
+  title,
   stats,
   sessions,
   typeLabels,
 }: {
-  programName: string;
+  /** R8 — el contexto: el nombre del programa elegido, o «Todos los programas». */
+  title: string;
   stats: ProgramStats;
   sessions: readonly SessionListItem[];
   typeLabels: ReadonlyMap<string, string>;
@@ -63,12 +64,12 @@ export function StatsPanel({
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-lg font-semibold">{programName}</CardTitle>
+        <CardTitle className="text-lg font-semibold">{title}</CardTitle>
         {stats.kind === 'empty' ? (
           <CardDescription>
-            Todavía no hay sesiones cerradas en este programa. Cuando detengas la primera —o
-            registres una a mano— aquí aparecerán los días trabajados, las horas, la racha, el
-            mapa de calor y la cadencia semanal.
+            Todavía no hay sesiones cerradas aquí. Cuando detengas la primera —o registres una
+            a mano— aparecerán los días trabajados, las horas, la racha, el mapa de calor y la
+            cadencia semanal.
           </CardDescription>
         ) : null}
       </CardHeader>

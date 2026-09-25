@@ -16,22 +16,32 @@ import { EMPTY_SESSION_ACTION_STATE } from '@/ui/session-form-state';
  * se salta abriendo dos pestañas.
  *
  * Los botones se deshabilitan cuando ya hay una sesión corriendo porque es
- * información útil, no porque sea el control.
+ * información útil, no porque sea el control. *
+ * R8 — el programa llega preseleccionado desde el contexto de la URL. Sigue
+ * siendo un selector completo: con «todos» no hay nada que preseleccionar y
+ * con un programa elegido el formulario ya viene apuntando ahí, pero se puede
+ * cambiar. Quien monta este formulario le pone una `key` que depende del
+ * contexto: sin ella React conserva la instancia al navegar y el estado inicial
+ * de `useState` no se vuelve a evaluar, así que el selector se quedaría en el
+ * programa anterior.
  */
 export function StartSessionForm({
   programs,
   sessionTypes,
   hasRunningSession,
+  selectedProgramId,
 }: {
   programs: readonly Program[];
   sessionTypes: readonly SessionType[];
   hasRunningSession: boolean;
+  /** R8 — programa del contexto, o `null` con «todos». */
+  selectedProgramId: string | null;
 }) {
   const [state, formAction, pending] = useActionState(
     startSessionAction,
     EMPTY_SESSION_ACTION_STATE,
   );
-  const [programId, setProgramId] = useState(programs[0]?.id ?? '');
+  const [programId, setProgramId] = useState(selectedProgramId ?? programs[0]?.id ?? '');
 
   const inputClass =
     'w-full rounded-md border border-black/15 bg-transparent px-3 py-2 text-sm dark:border-white/20';

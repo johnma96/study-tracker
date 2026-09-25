@@ -181,6 +181,23 @@ proyectar una fecha estimada de finalización a partir de la cadencia de las úl
 **RF-37.** Si un programa no tiene sesiones registradas, entonces el sistema debe mostrar un
 estado vacío explicativo y no un error ni tableros en cero.
 
+**RF-38 — Contexto de programa.** El sistema debe permitir elegir un programa que gobierne la
+vista completa —mapa de calor, totales, racha, cadencia, proyección, métricas y evidencia— y
+debe conservar esa elección en la URL. Sin elección explícita el contexto es «todos», y las
+secciones agregan los datos de todos los programas.
+
+> El contexto vive en la URL (`/?programa=<id>`), no en estado de cliente. No es un detalle de
+> implementación: es lo que hace que la selección sea compartible, sobreviva a recargar y la
+> pueda leer un Server Component. Un selector que necesite JavaScript para navegar incumple
+> este requerimiento aunque en pantalla se vea igual.
+
+**RF-39.** Si el programa indicado en la URL no existe o tiene un formato inválido, entonces el
+sistema debe presentar la vista de «todos» sin error.
+
+> Ese parámetro lo escribe cualquiera. La validación es por pertenencia a los programas que
+> existen, no por forma: comprobar que «parece un identificador» aceptaría uno inexistente y
+> dejaría la página rota ante un enlace viejo.
+
 ---
 
 ## Bloque 4 — Evidencia
@@ -276,6 +293,7 @@ del cliente.
 | 2b Pausas | RF-2A … RF-2E | Descansos sin inflar ni fragmentar |
 | 2c Recuperación | RF-2F … RF-2I | Una sesión abandonada no bloquea |
 | 3 Totales | RF-30 … RF-37 | Días, horas, mapa de calor, cadencia |
+| 8 Contexto | RF-38, RF-39 | Un programa gobierna la página; la URL lo conserva |
 | 4 Evidencia | RF-50 … RF-54 | Artefactos enlazados |
 | 5 Métricas | RF-60 … RF-63 | Series de progreso |
 | 6 Acceso | RF-40 … RF-44 | Autenticación |

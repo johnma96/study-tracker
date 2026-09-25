@@ -184,7 +184,8 @@
       "name": "Contexto de programa",
       "description": "Selector de programa en la URL (?programa=<id>, 'todos' por defecto) que gobierna la pagina entera: totales, mapa de calor, cadencia, metricas y evidencia se filtran por el programa elegido. El mapa suma todo con 'todos' y muestra solo uno al seleccionarlo. Sin cambios de maquetacion: eso es R9.",
       "requirements": [
-        "RF-13",
+        "RF-38",
+        "RF-39",
         "RF-30",
         "RF-31",
         "RF-32",
@@ -195,10 +196,10 @@
         "R4",
         "R5"
       ],
-      "status": "active",
-      "verification": "npm run test cubre el filtrado por programa y el caso 'todos', con una sesion de otro programa que no debe contar en los totales del seleccionado; revertir el filtro hace fallar la suite",
-      "evidence": null,
-      "testedAt": null
+      "status": "passing",
+      "verification": "npm run test cubre el filtrado por programa y el caso «todos», con una sesion de otro programa que no debe contar en los totales del seleccionado; revertir el filtro hace fallar la suite",
+      "evidence": "npm run test: 304 pruebas en 19 archivos (antes 281 en 18); 23 nuevas, 22 en program-context.test.ts y 1 en session-listing.test.ts. Reversion comprobada de verdad: se dejo filterByProgramContext devolviendo [...items] siempre y cayeron 5 pruebas en 2 archivos —\"con un programa entran solo las suyas\", \"sirve igual para metricas...\", \"con el programa elegido, los totales ignoran la sesion ajena\", y las dos de RF-30 en session-listing—; al restaurar el filtro vuelven 304/304. npm run test:integration: 26/26 contra el branch dev de Neon. npm run check, npm run lint (0 errores, 1 warning preexistente en program-input.test.ts) y npm run build sin errores. ./init.sh termina en Init OK. Humo con curl contra el servidor local y los datos reales de dev: /?programa=todos da HTTP 200 con tablero «Todos los programas», 3 sesiones y 0,2 h; /?programa=<Harness Engineering> da HTTP 200 con tablero propio en estado vacio, porque las 3 sesiones son de «Prueba R7» y no cuentan para el; /?programa=<Prueba R7> da sus 3 sesiones; /?programa=no-existe-123 y /?programa=%27%20OR%201%3D1%20-- dan HTTP 200 y caen en «todos» sin error. Evidencia y metricas filtradas verificadas en el mismo humo: con el contexto de Harness Engineering la evidencia muestra su estado vacio y la seccion de metricas solo lista ese programa. El selector se sirve como enlaces <a href=\"/?programa=...\">: funciona sin JavaScript en el cliente. Sin verificar en produccion: la VPN corporativa bloquea vercel.app. Verificado en local contra el branch dev de Neon.",
+      "testedAt": "2026-09-25"
     },
     {
       "id": "R9",

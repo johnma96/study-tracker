@@ -2,7 +2,8 @@ import { eq, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import type { Session } from '@/core/model/session';
-import { listProgramSessions } from '@/core/services/session-listing';
+import type { ProgramContext } from '@/core/services/program-context';
+import { listSessionsInContext } from '@/core/services/session-listing';
 import { buildProgramStats } from '@/core/services/study-stats';
 import { getDb } from '@/infra/db/client';
 import { programs, sessions } from '@/infra/db/schema';
@@ -105,7 +106,8 @@ describe('R3 — historial leído de la base', () => {
     expect(mine.some((session) => session.pausedSeconds === 600)).toBe(true);
 
     // RF-30 — orden descendente por inicio, fechas y duraciones de Colombia.
-    const listado = listProgramSessions(all, programId);
+    const contexto: ProgramContext = { kind: 'program', programId };
+    const listado = listSessionsInContext(all, contexto);
 
     expect(listado.map((item) => [item.date, item.startTime, item.minutes])).toEqual([
       ['2026-09-24', '23:40', 40],
