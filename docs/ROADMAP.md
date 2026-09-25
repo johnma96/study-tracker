@@ -129,9 +129,12 @@ Definir métricas por programa, registrar lecturas, graficar la serie.
 - **Confirmación humana:** cargar los scores reales de `validate-harness.mjs` y ver la curva
   con su línea de objetivo en 80.
 
-### R6 — Autenticación · 1 sesión · compuerta
+### R6 — Autenticación · 1 sesión · compuerta · **DIFERIDA**
 
 Auth.js con un proveedor OAuth y lista blanca por variable de entorno.
+
+> **Diferida el 25/09/2026 con riesgo aceptado.** Las condiciones que la vuelven obligatoria
+> están en `RF-40` de `docs/REQUIREMENTS.md`. Revísalas antes de descartarla otra vez.
 
 - **Requerimientos:** RF-40 … RF-44
 - **Verificación ejecutable:** `curl` sin credenciales contra una ruta de lectura y contra una

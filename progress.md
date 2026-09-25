@@ -4,11 +4,11 @@
 
 **Última actualización:** 25/09/2026
 **Feature activa:** ninguna.
-**Estado del repositorio:** R0 a R5 en `passing`; R3, R4 y R5 se hicieron en paralelo y ya
-están integradas en `main`. Tres migraciones (`0000` a `0002`). El despliegue en
-<https://study-tracker-eight-sigma.vercel.app/> sigue en R2: nada de esto se ha empujado.
+**Estado del repositorio:** R0 a R5 en `passing`. **R6 diferida con riesgo aceptado**, ver
+`RF-40`. Todo empujado.
 **Bloqueos:** ninguno. El branch `dev` de Neon **expira el 02/10/2026**.
-**Siguiente paso:** R6 (autenticación) antes de cargar datos reales. Ver `session-handoff.md`.
+**Siguiente paso:** deuda pendiente (`repo_url` para `RF-52`, deduplicar el listado de sesiones)
+o R6 si se cumple alguna de sus condiciones de disparo.
 
 ---
 
@@ -850,3 +850,56 @@ del árbol. Quedan en el historial, en el commit `d002ff2`.
 **Next session**
 
 R6, antes de cargar datos reales. Detalle en `session-handoff.md`.
+
+---
+
+### Sesión 12 — 25/09/2026 — R6 diferida con riesgo aceptado
+
+**Duración:** ~15 min
+**Objetivo:** decidir sobre la autenticación antes de empujar R3, R4 y R5.
+
+**What was done**
+
+Se lanzó el agente de R6 y **se detuvo a los pocos minutos**, antes de que escribiera código, tras
+una decisión explícita del usuario. El repositorio quedó intacto.
+
+Se registró el diferimiento donde corresponde: `RF-40` en `docs/REQUIREMENTS.md` y la cabecera de
+R6 en `docs/ROADMAP.md`, ambos con las condiciones que vuelven la autenticación obligatoria.
+
+**Decisions**
+
+**R6 se difiere, con el riesgo evaluado y asumido por escrito.** Razones del usuario, que se
+consideran válidas: es un tracker personal, sin datos de terceros, sin credenciales y sin
+información que importe exponer; la URL no se ha compartido; el peor caso realista es que alguien
+escriba filas basura, que se borran.
+
+Se dejó constancia de un dato que forma parte de la decisión: los subdominios `vercel.app` son
+descubribles por los registros públicos de transparencia de certificados, así que no publicar la
+URL no equivale a que sea secreta.
+
+**Se escribieron cuatro condiciones de disparo** que vuelven `RF-40` obligatoria: compartir la
+URL, almacenar algo que importe, que la use una segunda persona, o detectar actividad no
+reconocida.
+
+> Esa lista es el punto de la decisión. `RF-40` ya se había incumplido una vez sin que nadie lo
+> notara, porque era una compuerta sin mecanismo. Un riesgo aceptado **por escrito y con
+> disparadores** es una decisión de ingeniería; uno olvidado es el mismo defecto de antes con
+> otra cara.
+
+**Issues**
+
+Ninguno.
+
+**Hallazgos fuera de alcance**
+
+- `repo_url` en `programs`, que `RF-52` necesita para que las rutas relativas de evidencia sean
+  enlaces y no texto. Deuda de R4.
+- Deduplicar el listado de sesiones: el abanico dejó dos en la página, porque tres agentes
+  construyeron cada uno su propia lectura. Deuda que creó el paralelismo.
+- En producción, la métrica "Harness score" no existirá hasta correr `db:seed` contra esa base.
+  `vercel-build` corre `migrate` pero no `seed`; como `seed` es idempotente, encadenarlo
+  eliminaría el paso manual.
+
+**Next session**
+
+La deuda pendiente, o el curso.

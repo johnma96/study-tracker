@@ -225,6 +225,29 @@ anterior, según la dirección de mejora de la métrica.
 **RF-40.** Antes del primer despliegue público que contenga datos reales, el sistema debe
 exigir autenticación para toda operación de lectura y escritura.
 
+> **Diferido a propósito el 25/09/2026, con riesgo aceptado y por escrito.**
+>
+> La aplicación está desplegada y acepta escrituras sin autenticación. El riesgo se evaluó y se
+> asumió: es un tracker personal, sin datos de terceros, sin credenciales y sin información que
+> importe exponer. La URL no se ha compartido. El peor caso realista es que alguien escriba
+> filas basura, que se borran.
+>
+> Dato que forma parte de la decisión: los subdominios `vercel.app` **son descubribles** a través
+> de los registros públicos de transparencia de certificados. Que no se haya publicado la URL no
+> equivale a que sea secreta.
+>
+> **Condiciones que vuelven `RF-40` obligatoria.** Al cumplirse cualquiera, R6 pasa a ser trabajo
+> inmediato y anterior a cualquier otra rebanada:
+>
+> 1. Se comparte la URL con alguien, por cualquier medio.
+> 2. La aplicación almacena algo que importe perder, exponer o ver alterado.
+> 3. La usa una segunda persona.
+> 4. Aparece actividad no reconocida: filas que nadie creó, o consumo anómalo en Neon o Vercel.
+>
+> Esta lista existe porque `RF-40` ya se incumplió una vez sin que nadie se enterara: era una
+> compuerta sin ningún mecanismo que la hiciera cumplir. Ahora al menos tiene disparadores
+> escritos.
+
 **RF-41.** El sistema debe restringir el acceso a una lista blanca de correos configurada por
 variable de entorno.
 
