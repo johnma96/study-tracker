@@ -249,3 +249,83 @@ Ninguno.
 **Next session**
 
 Implementar R1 — Programas, empezando por instalar Vitest.
+
+---
+
+### Sesión 5 — 25/09/2026 — R1: Programas
+
+**Duración:** ~75 min
+**Objetivo:** implementar R1 (`RF-10` a `RF-15`): crear y listar programas, tipos de sesión por
+programa, y estrenar Vitest con la regla completa de la *Definition of Done*.
+
+**What was done**
+
+- **Vitest instalado y corriendo antes de la feature.** La primera prueba se escribió contra un
+  módulo que todavía no existía y se vio fallar; después se implementó. Scripts `test` y
+  `test:watch` en `package.json`; `./init.sh` ya los invocaba con `--if-present` y ahora los
+  ejecuta de verdad.
+- **51 pruebas en 5 archivos**, todas sobre `core/` y sin base de datos: `program-name` (RF-14),
+  `program-order` (RF-13), `program-input` (RF-44), `session-type` (RF-15) y `civil-date`.
+- **RF-10 a RF-15 implementados**: `session_types` en el esquema, repositorio con `create`,
+  `listSessionTypes` y `createSessionType`, Server Actions con `zod`, formularios y listado.
+- **Semilla ampliada** con los cuatro tipos del curso, manteniendo la idempotencia con
+  `on conflict (program_id, code) do nothing`.
+- **Un defecto real encontrado y corregido durante la verificación**: `isUniqueViolation` miraba
+  `error.code` del error de primer nivel, pero Drizzle envuelve el error del driver en
+  `DrizzleQueryError` y deja el `NeonDbError` en `cause`. La comprobación daba siempre falso y
+  un código de tipo de sesión repetido llegaba al usuario como excepción de Postgres —
+  exactamente lo que el propio requerimiento pide evitar. Ahora se recorre la cadena de `cause`.
+
+**Decisions**
+
+1. **El esquema de validación vive en `core/services/program-input.ts`, no en la Server Action.**
+   `app/` queda como adaptador: convierte `FormData` en cadenas y traduce el resultado. Así
+   RF-14 y RF-44 se prueban sin levantar Next ni base de datos, que es la justificación que
+   `docs/ARCHITECTURE.md` da para toda la separación por capas. `zod` no rompe la regla: no es
+   React, Next, Drizzle ni la base.
+2. **El orden de RF-13 se calcula en `core/`, no en un `ORDER BY`.** El repositorio trae las
+   filas y delega en `sortPrograms`. Duplicar la regla en SQL dejaría dos definiciones y solo
+   una probada. Con un puñado de programas ordenar en memoria no cuesta nada; si la tabla
+   creciera hasta que importe, el orden baja al SQL y las pruebas siguen siendo su contrato.
+3. **Las longitudes se miden en puntos de código**, no con `String.prototype.length`. Un emoji
+   mide 2 en JavaScript y 1 para `char_length()` de Postgres; medir distinto deja a la
+   aplicación aceptando lo que el motor rechaza.
+4. **Las fechas nulas van al final del listado.** RF-13 no dice qué hacer con ellas y Postgres,
+   con `DESC`, las pondría primero: un programa sin fecha encabezaría la lista por encima del
+   más reciente.
+5. **Límites de `session_types` fijados por la implementación**: código 1..8, etiqueta 1..80.
+   RF-15 dice "código corto" sin dar un tope, y `text` sin límite acepta un párrafo.
+6. **`@types/node` sube de `^20` a `^24`.** Vitest 5 exige `^22 || >=24` y el runtime real es
+   Node 24; la plantilla de `create-next-app` había dejado `^20`.
+
+**Issues**
+
+- Probar la Server Action por HTTP (`POST` con cabecera `Next-Action`) exigiría replicar la
+  codificación interna de argumentos de React 19, que es privada y cambia entre versiones. En
+  su lugar se movió la validación a `core/` y se probó allí, que cubre lo mismo con menos
+  acoplamiento. La verificación del camino de escritura completo se hizo con un archivo de un
+  solo uso contra Neon, ya eliminado.
+
+**Hallazgos fuera de alcance**
+
+- **`CLAUDE.md` sigue diciendo "Semilla. Documentación y harness completos; sin código todavía.
+  La primera rebanada por implementar es R0."** Es falso desde la sesión 4. Un agente que
+  arranque leyendo el flujo en orden recibe ese estado como cierto en el paso 2, antes de llegar
+  a `feature_list.json` en el paso 8. No se corrigió por la regla "Stay in scope".
+- **Sin migraciones versionadas.** `drizzle-kit push` sigue sirviendo porque la base solo tiene
+  la fila semilla. Deja de servir en cuanto R2 registre sesiones reales: ese es el momento de
+  pasar a migraciones, y debería ser trabajo propio, no un agregado dentro de otra rebanada.
+- **Un solo branch de Neon.** Local y producción comparten base. La verificación de esta sesión
+  insertó y borró filas de prueba en la misma base que sirve producción. Con datos reales eso
+  es inaceptable; crear el branch `dev` es barato y conviene antes de R2.
+- **`plannedSessions` no se puede capturar por la interfaz.** RF-10 no lo enumera entre los
+  campos de creación, así que el formulario no lo incluye; hoy solo lo pone la semilla. RF-36
+  (R3) lo necesita para proyectar la fecha de finalización. O RF-10 está incompleto o RF-36
+  necesitará una edición de programa que nadie ha especificado.
+- **No existe edición ni borrado de programas.** Ningún `RF` los pide. Un nombre mal escrito hoy
+  solo se arregla entrando a la base a mano.
+
+**Next session**
+
+Implementar R2 — Cronómetro. Es el corazón del MVP y la rebanada más grande: índice único,
+pausas y recuperación de sesión abandonada van juntos, no en tandas.

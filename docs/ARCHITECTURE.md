@@ -132,3 +132,7 @@ APP_TIMEZONE=America/Bogota
 | 7 | Vitest en R1, shadcn/ui en R3, no en R0 | 25/09/2026 | R0 no tiene lógica que probar ni tableros que construir |
 | 8 | `agentRules: false` en `next.config.ts` | 25/09/2026 | `next dev` reescribe `AGENTS.md`, el archivo canónico del harness |
 | 9 | `APP_TIMEZONE` en vez de `TZ` | 25/09/2026 | Vercel reserva `TZ`; de fondo, la zona es regla de dominio, no configuración |
+| 10 | `zod` para validar la entrada del servidor | 25/09/2026 | RF-44. Es la implementación concreta del "esquema (`zod` o equivalente)" que ya preveía la sección "Flujo de datos" |
+| 11 | El esquema de entrada vive en `core/services`, no en la Server Action | 25/09/2026 | Permite probar RF-14 y RF-44 sin levantar Next ni base de datos, que es la justificación declarada de la separación por capas. `zod` no viola la regla: no es React, Next, Drizzle ni la base |
+| 12 | El orden de RF-13 se calcula en `core/`, no en un `ORDER BY` | 25/09/2026 | Los empates y las fechas nulas son donde se esconden los errores; en SQL no se prueban sin base de datos |
+| 13 | `@types/node` sube de `^20` a `^24` | 25/09/2026 | Vitest 5 lo exige (`^22 \|\| >=24`) y el runtime real de la máquina es Node 24. La plantilla de `create-next-app` había dejado `^20` |

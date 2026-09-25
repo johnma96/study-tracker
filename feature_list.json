@@ -42,10 +42,10 @@
       "dependencies": [
         "R0"
       ],
-      "status": "active",
-      "verification": "npm run test -- programs (Vitest se instala al abrir esta rebanada), y crear un programa por la interfaz persiste tras recargar",
-      "evidence": null,
-      "testedAt": null
+      "status": "passing",
+      "verification": "npm run test (51 pruebas de core/, sin base de datos) + npm run check + npm run lint + npm run build + npm run db:push + npm run db:seed dos veces + npm run dev con curl a http://localhost:3000/",
+      "evidence": "LOCAL, todo ejecutado el 25/09/2026. npm run test: 5 archivos, 51 pruebas, todas pasan (program-name, program-order, program-input, session-type, civil-date). Prueba de reversion: al deshacer sortPrograms() y el limite de 120 de RF-14, fallan 13 pruebas de los tres archivos que cubren RF-13 y RF-14; restaurado el cambio, vuelven las 51. npm run check OK (next typegen && tsc --noEmit, 0 errores). npm run lint OK. npm run build OK (Next 16.3.6, ruta / dinamica). npm run db:push creo session_types en Neon; estructura verificada contra information_schema y pg_constraint: UNIQUE (program_id, code), FOREIGN KEY ON DELETE CASCADE y los CHECK de longitud de code (1..8) y label (1..80). Solo existen las tablas programs y session_types: metrics y readings son de R5 y no se crearon. npm run db:seed inserto los cuatro tipos del curso (E Estudio, C Construccion, K Consolidacion, V Checkpoint); la segunda ejecucion imprime \"Tipos de sesion ya presentes (4). Sin cambios en session_types\", con lo que la idempotencia queda probada. npm run dev + curl http://localhost:3000/ devuelve HTTP 200 con el programa \"Harness Engineering\" y sus cuatro tipos de sesion renderizados. Verificacion de un solo uso contra Neon (archivo temporal, eliminado despues de correr): crear un programa por el mismo camino que la Server Action persiste y se recupera con list(); con tres programas insertados en el orden contrario al esperado, list() los devuelve en el orden de RF-13 (active con fecha, active sin fecha, planned con fecha mas reciente); un codigo de tipo de sesion repetido devuelve null en vez de propagar la excepcion de Postgres. Esa verificacion encontro un defecto real: Drizzle envuelve el error del driver en DrizzleQueryError y deja el NeonDbError en cause, asi que la deteccion del codigo 23505 solo funciona recorriendo la cadena de cause. Corregido. Las filas de prueba se borraron: la base queda con un solo programa. ./init.sh termina en \"Init OK\" e incluye npm run test. PRODUCCION: no verificada. La VPN corporativa bloquea vercel.app y la interceptacion TLS impide llegar por linea de comandos. El criterio de hecho de R1 no exige la URL de produccion (eso era exclusivo de R0); la verificacion local cubre lo que R1 promete.",
+      "testedAt": "2026-09-25"
     },
     {
       "id": "R2",

@@ -7,73 +7,93 @@
 
 ## Current Objective
 
-Implementar **R1 — Programas**: crear y listar programas, y ampliar la semilla con los cuatro
-tipos de sesión y la métrica del curso.
+Implementar **R2 — Cronómetro**: `RF-00` y `RF-20` a `RF-29`, más las pausas (`RF-2A` a `RF-2E`)
+y la recuperación de sesión abandonada (`RF-2F` a `RF-2I`).
 
-Requerimientos: `RF-10` a `RF-15` en `docs/REQUIREMENTS.md`.
-
-**Vitest se instala al abrir esta rebanada.** R1 sí introduce lógica de dominio —validación de
-nombre, orden de listado— así que aplica la regla completa de la *Definition of Done*: al menos
-una prueba que falle si se revierte el cambio.
+Es el corazón del MVP y la rebanada más grande del plan: dos sesiones estimadas. Las tres partes
+van **juntas**, no en tandas. El índice único de "máximo una sesión en curso" y el flujo de
+recuperación son la misma moneda: implementar el índice sin la válvula de escape deja la
+aplicación en un estado del que el usuario no puede salir sin entrar a la base a mano.
 
 ## What was done
 
-**R0 cerrada en `passing`.** La aplicación está desplegada y sirviendo datos de Neon en
-<https://study-tracker-eight-sigma.vercel.app/>. La cadena completa —repositorio, build,
-despliegue, base de datos, render— quedó probada, que era el único propósito de esa rebanada.
+**R1 cerrada en `passing`.** Crear y listar programas, tipos de sesión propios de cada programa
+y la semilla ampliada. `RF-10` a `RF-15` implementados y verificados en local.
 
-Después del despliegue se corrigieron **cinco huecos del harness** detectados al construir R0.
-Todos salieron de ejecutarlo contra código real; ninguno habría aparecido releyendo documentos:
+- **Vitest en marcha.** 51 pruebas en 5 archivos, todas sobre `core/` y sin base de datos.
+  `npm run test` y `npm run test:watch` existen y `./init.sh` los ejecuta.
+- **La regla completa de la *Definition of Done* se cumplió**: al revertir `sortPrograms()` y el
+  límite de 120 caracteres de `RF-14`, fallan 13 pruebas; restaurado el cambio, vuelven las 51.
+- **Validación en el servidor (`RF-44`).** El esquema `zod` vive en
+  `src/core/services/program-input.ts`, no en la Server Action, para poder probarlo sin levantar
+  Next ni base de datos. `src/app/actions.ts` es solo el adaptador de `FormData`.
+- **`session_types` en Neon**, con `UNIQUE (program_id, code)`, `ON DELETE CASCADE` y `CHECK` de
+  longitud. La semilla dejó `E` Estudio, `C` Construcción, `K` Consolidación, `V` Checkpoint, y
+  es idempotente.
+- **Un defecto real corregido:** Drizzle envuelve el error del driver en `DrizzleQueryError` y
+  deja el `NeonDbError` en `cause`. La detección del código `23505` solo funciona recorriendo la
+  cadena de `cause`; sin eso, un código de tipo de sesión repetido llegaba al usuario como
+  excepción de Postgres.
 
-1. `docs/ARCHITECTURE.md` indicaba `create-next-app .`, que **falla** sobre un repositorio con
-   archivos propios. Documentado el andamiaje en subdirectorio temporal.
-2. La *Definition of Done* era insatisfacible para una rebanada de infraestructura. Ahora
-   distingue rebanadas con lógica de dominio de las que no la tienen.
-3. La regla de selección de feature podía quedarse sin candidata. Se agregó el caso 3.
-4. `check` estaba documentado como `tsc --noEmit`; sobre un clon limpio hace falta
-   `next typegen` antes.
-5. `ARCHITECTURE` contradecía al `ROADMAP` sobre shadcn en R0.
-
-También: `TZ` renombrada a `APP_TIMEZONE` porque Vercel reserva ese nombre.
+**`metrics` y `readings` no se crearon.** Son tablas de R5, junto con la siembra de la métrica
+"Harness score". `docs/DATA-MODEL.md` ya lo dice explícitamente en su sección de datos semilla.
 
 ## What is broken or unverified
 
-- **Sin pruebas automatizadas todavía.** Vitest no está instalado. Es lo primero de R1.
-- **Sin migraciones versionadas.** Se usa `drizzle-kit push`. Sirve mientras la base no tenga
-  datos que importe perder; deja de servir en cuanto haya sesiones reales registradas.
-- **Un solo branch de Neon.** Local y producción apuntan a la misma base, contra lo que plantea
-  `docs/ARCHITECTURE.md`. Crear un branch `dev` es barato y conviene hacerlo antes de que haya
-  datos reales.
-- **`APP_TIMEZONE` no la lee ningún código.** Y según el análisis registrado en
-  `ARCHITECTURE.md` probablemente deba ser una constante en `core/`, no una variable de
-  entorno. Se decide cuando R3 implemente la agrupación por día.
-- **La verificación de despliegues exige un dispositivo fuera de la red corporativa.** La VPN
-  de Protección bloquea `vercel.app` y la interceptación TLS impide comprobarlo desde la
-  máquina de trabajo, incluso por línea de comandos.
+- **Producción sin verificar.** La VPN corporativa bloquea `vercel.app` y la interceptación TLS
+  impide comprobarlo por línea de comandos. Toda verificación de despliegue exige un dispositivo
+  fuera de la red corporativa. R1 no tiene la URL de producción en su criterio de hecho —eso era
+  exclusivo de R0—, así que no bloquea el cierre, pero **conviene confirmar el despliegue antes
+  de empezar R2**.
+- **Un solo branch de Neon.** Local y producción comparten base. La verificación de esta sesión
+  insertó y borró filas de prueba en la base que sirve producción. Antes de que R2 registre
+  sesiones reales, crear el branch `dev` deja de ser opcional.
+- **Sin migraciones versionadas.** `drizzle-kit push` sirve mientras la base solo tenga la fila
+  semilla. R2 es la rebanada en la que aparecen datos que importa no perder: el cambio a
+  migraciones versionadas debería ser trabajo propio, no un agregado dentro de R2.
+- **`APP_TIMEZONE` sigue sin leerla ningún código.** R2 es donde `RF-00` empieza a pesar de
+  verdad. Según el análisis de `docs/ARCHITECTURE.md`, la zona debería ser una constante en
+  `core/` y no una variable de entorno: decídelo al implementar la agrupación por día.
+- **`CLAUDE.md` describe el repositorio como semilla sin código.** Es falso desde la sesión 4 y
+  el flujo de arranque lo hace leer en el paso 2, antes de `feature_list.json`. No se corrigió
+  por la regla "Stay in scope"; corrígelo al abrir la próxima sesión, antes de empezar R2.
+- **Ninguna feature quedó en `status: "active"`.** Es correcto: la política dice "como máximo
+  una". El caso 2 de la regla de selección elige R2, cuya única dependencia (R1) ya está en
+  `passing`.
 
 ## Files
 
-Sin cambios de código en esta sesión. Modificados: `feature_list.json`, `progress.md`,
-`README.md`, `AGENTS.md`, `docs/ARCHITECTURE.md`, `.env.example` y este archivo.
+**Nuevos:** `vitest.config.mts`, `src/app/actions.ts`, `src/core/model/session-type.ts`,
+`src/core/services/` (`program-name.ts`, `program-order.ts`, `program-input.ts`,
+`session-type.ts`, `civil-date.ts`, `text.ts` y sus cinco archivos de prueba),
+`src/ui/form-state.ts`, `src/ui/labels.ts`, `src/ui/program-form.tsx`,
+`src/ui/session-type-form.tsx`.
+
+**Modificados:** `package.json`, `package-lock.json`, `scripts/seed.mjs`, `src/app/page.tsx`,
+`src/core/model/program.ts`, `src/core/ports/program-repository.ts`, `src/infra/db/schema.ts`,
+`src/infra/repos/drizzle-program-repository.ts`, `src/ui/program-card.tsx`, `AGENTS.md`,
+`docs/ARCHITECTURE.md`, `docs/DATA-MODEL.md`, `feature_list.json`, `progress.md` y este archivo.
 
 ## Blockers
 
-Ninguno. R1 puede empezar de inmediato.
+Ninguno. R2 puede empezar de inmediato.
 
 ## Next Session
 
-Recommended Next Step: implementar **R1 — Programas**.
+Recommended Next Step: implementar **R2 — Cronómetro**.
 
-1. `cd study-tracker` y confirmar con `pwd`. No trabajar desde el repositorio del curso.
-2. `./init.sh` — debe terminar en "Init OK".
-3. Instalar Vitest y dejar corriendo una primera prueba antes de escribir la feature.
-4. `RF-10` a `RF-14`: crear y listar programas, con validación **en el servidor** (`RF-14`:
-   nombre entre 1 y 120 caracteres) y el orden de `RF-13` (`active` primero, luego fecha de
-   inicio descendente).
-5. `RF-15`: tipos de sesión propios de cada programa. Ampliar `scripts/seed.mjs` con los cuatro
-   del curso —`E` Estudio, `C` Construcción, `K` Consolidación, `V` Checkpoint— y la métrica
-   "Harness score" (unidad "puntos", dirección `up`, objetivo 80).
-6. Cerrar según el procedimiento "End of Session" de `AGENTS.md`.
+1. `cd study-tracker` y confirmar con `pwd`. No trabajar desde el repositorio del curso: la
+   terminal tiende a reposicionarse ahí sola.
+2. `./init.sh` — debe terminar en "Init OK" y ejecutar las 51 pruebas.
+3. Corregir el estado que `CLAUDE.md` declara. Es parte de la ruta de reinicio limpio.
+4. Antes de escribir código de sesiones, decidir el branch `dev` de Neon y si se pasa a
+   migraciones versionadas. Las dos cosas son más baratas ahora que con sesiones registradas.
+5. Escribir primero las pruebas de duración efectiva: los seis casos de la tabla de
+   `docs/DATA-MODEL.md` viven en `core/services` y se prueban sin base de datos.
+6. Implementar el índice único **junto con** el flujo de recuperación (`RF-2F` a `RF-2I`).
+7. `RF-21`: el tiempo transcurrido se deriva de la marca de inicio almacenada, nunca de un
+   contador en JavaScript. Es lo que hace que sobreviva a cerrar la pestaña.
+8. Cerrar según el procedimiento "End of Session" de `AGENTS.md`.
 
-Recordatorio de alcance: R1 **no** incluye cronómetro. Eso es R2, y trae consigo las pausas y
-el flujo de recuperación de sesión abandonada.
+Recordatorio de alcance: shadcn/ui y Recharts entran en **R3**, no antes. `metrics` y `readings`
+son de **R5**.

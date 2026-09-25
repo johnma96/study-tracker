@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { check, date, integer, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
+import { check, date, integer, pgTable, text, timestamp, unique, uuid } from 'drizzle-orm/pg-core';
 
 /**
  * Esquema Drizzle de `programs`, transcrito del DDL de docs/DATA-MODEL.md.
@@ -44,3 +44,34 @@ export const programs = pgTable(
 );
 
 export type ProgramRow = typeof programs.$inferSelect;
+
+/**
+ * Esquema Drizzle de `session_types` (RF-15), transcrito del DDL de
+ * docs/DATA-MODEL.md.
+ *
+ * `ON DELETE CASCADE` cumple el invariante 6: borrar un programa se lleva sus
+ * tipos de sesión.
+ *
+ * Los CHECK de longitud **no** están en el DDL del documento: lo añade esta
+ * rebanada porque RF-15 exige "código corto" sin fijar un tope, y una columna
+ * `text` sin límite acepta un párrafo como código. Los valores coinciden con
+ * `core/services/session-type.ts`, que es donde se valida antes de llegar aquí.
+ */
+export const sessionTypes = pgTable(
+  'session_types',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    programId: uuid('program_id')
+      .notNull()
+      .references(() => programs.id, { onDelete: 'cascade' }),
+    code: text('code').notNull(),
+    label: text('label').notNull(),
+  },
+  (table) => [
+    unique('session_types_program_code').on(table.programId, table.code),
+    check('session_types_code_length', sql`char_length(${table.code}) between 1 and 8`),
+    check('session_types_label_length', sql`char_length(${table.label}) between 1 and 80`),
+  ],
+);
+
+export type SessionTypeRow = typeof sessionTypes.$inferSelect;

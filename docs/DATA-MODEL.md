@@ -92,8 +92,8 @@ CREATE TABLE programs (
 CREATE TABLE session_types (
   id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   program_id uuid NOT NULL REFERENCES programs(id) ON DELETE CASCADE,
-  code       text NOT NULL,
-  label      text NOT NULL,
+  code       text NOT NULL CHECK (char_length(code) BETWEEN 1 AND 8),
+  label      text NOT NULL CHECK (char_length(label) BETWEEN 1 AND 80),
   UNIQUE (program_id, code)
 );
 
@@ -151,6 +151,11 @@ CREATE TABLE readings (
 );
 ```
 
+> Los `CHECK` de longitud de `session_types` los fija R1: RF-15 pide "código corto" y
+> "etiqueta" sin dar un tope, y una columna `text` sin límite acepta un párrafo como código.
+> Los valores coinciden con `src/core/services/session-type.ts`, que es donde se valida antes
+> de llegar al motor.
+
 > `gen_random_uuid()` requiere `pgcrypto` en Postgres anteriores a 13. Neon corre versiones
 > recientes donde la función está disponible de fábrica. Si el motor la rechaza, ejecuta
 > `CREATE EXTENSION IF NOT EXISTS pgcrypto;`.
@@ -185,3 +190,8 @@ planned_sessions: 41
 session_types: E Estudio · C Construcción · K Consolidación · V Checkpoint
 metrics: "Harness score" (unit "puntos", direction "up", target 80)
 ```
+
+> **Reparto por rebanada.** R1 siembra `programs` y `session_types`. La métrica "Harness
+> score" se siembra en **R5**, que es donde nacen las tablas `metrics` y `readings`: crear una
+> tabla cuya feature todavía no existe deja código sin prueba que lo cubra y contradice la
+> *Definition of Done*.

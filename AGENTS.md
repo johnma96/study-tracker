@@ -36,7 +36,8 @@ Before writing code, en este orden:
 ./init.sh            # instala, verifica tipos, lint y build. Puerta de entrada.
 npm run check        # next typegen && tsc --noEmit
 npm run lint         # eslint
-npm run test         # vitest run  (existe a partir de R1)
+npm run test         # vitest run  (pruebas de core/, sin base de datos)
+npm run test:watch   # vitest en modo observador
 npm run build        # next build
 npm run dev          # servidor local
 npm run db:push      # aplica el esquema a la base de datos

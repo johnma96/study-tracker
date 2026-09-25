@@ -47,3 +47,20 @@ export interface Program {
   plannedSessions: number | null;
   createdAt: Date;
 }
+
+/**
+ * Datos para crear un programa (RF-10).
+ *
+ * Los campos son exactamente los que enumera RF-10: nombre, proveedor, tipo,
+ * estado, fecha de inicio y fecha objetivo. `plannedSessions` existe en la
+ * tabla pero **no** se captura aquí: RF-10 no lo pide y su uso aparece en
+ * RF-36, que pertenece a R3. `id` y `createdAt` los genera la base.
+ */
+export interface NewProgram {
+  name: string;
+  provider: string | null;
+  kind: ProgramKind;
+  status: ProgramStatus;
+  startedAt: string | null;
+  targetAt: string | null;
+}
