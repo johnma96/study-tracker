@@ -29,10 +29,49 @@ La secuencia intuitiva (JSON local → SQLite → Postgres en producción) oblig
 capa de datos dos veces e introduce defectos que solo aparecen en producción. Con Postgres en
 todos lados no hay migración de motor en ningún momento.
 
-- **Desarrollo:** un *branch* de Neon llamado `dev`, o Postgres local con Docker Compose.
-- **Producción:** Neon vía la integración de Vercel.
+- **Desarrollo:** el branch `dev` de Neon.
+- **Producción:** el branch principal, vía la integración de Vercel.
 
 Misma sintaxis SQL, mismas migraciones, cero conversión de datos.
+
+### Una sola variable, valor distinto por entorno
+
+`DATABASE_URL` se llama igual en todos lados y cambia de valor según el entorno: local apunta a
+`dev`, Vercel al principal. **La cadena de producción no debe existir en el `.env` local.**
+
+No inventes nombres como `DATABASE_URL_DEV` que el código tenga que elegir: eso mete la decisión
+de entorno dentro de la aplicación, que es exactamente lo que las variables de entorno existen
+para evitar. Y mientras el código siga leyendo `DATABASE_URL`, agregar una variable paralela no
+cambia a qué base te conectas — solo lo aparenta.
+
+> Ocurrió el 25/09/2026: se creó el branch `dev` y se agregó `DATABASE_URL_DEV`, pero
+> `DATABASE_URL` seguía apuntando a producción, así que el entorno local seguía escribiendo en
+> la base del despliegue. El síntoma es invisible: todo funciona, solo que contra la base
+> equivocada.
+
+### El branch `dev` caduca
+
+**Creado el 25/09/2026 con TTL de 7 días: expira el 02/10/2026.** Es configuración del panel de
+Neon, no del repositorio.
+
+Síntoma cuando expire: los comandos que tocan la base fallan con error de conexión o host
+desconocido. **No es un problema del código** — no lo depures ahí.
+
+Recuperación, unos cinco minutos:
+
+```bash
+# 1. En el panel de Neon, crear de nuevo un branch dev desde el principal
+# 2. Copiar su cadena pooled a DATABASE_URL en .env
+npm run db:push     # aplica el esquema
+npm run db:seed     # siembra, es idempotente
+```
+
+Un branch de Neon es un clon *copy-on-write* del padre, así que nace con el esquema y los datos
+del principal ya adentro: `db:push` suele reportar "No changes detected" y la semilla "ya
+presente". Es lo esperado, no una señal de que algo falló.
+
+Si el trabajo se extiende más allá del 02/10, conviene revisar en el panel si el TTL se puede
+extender o quitar, antes de que expire a mitad de una sesión.
 
 ## Capas
 

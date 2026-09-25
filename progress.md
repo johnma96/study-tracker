@@ -3,11 +3,11 @@
 ## Current State
 
 **Última actualización:** 25/09/2026
-**Feature activa:** ninguna. La siguiente es R2 — Cronómetro (el paso 8 de `AGENTS.md` la selecciona).
+**Feature activa:** ninguna. La siguiente es R2 — Cronómetro.
 **Estado del repositorio:** R0 y R1 en `passing`. Desplegado en
 <https://study-tracker-eight-sigma.vercel.app/>.
-**Bloqueo para R2:** falta el branch `dev` en Neon. Hoy local y producción comparten base.
-**Siguiente paso:** crear el branch `dev`, luego arrancar R2.
+**Bloqueos:** ninguno. Branch `dev` de Neon en uso; **expira el 02/10/2026**.
+**Siguiente paso:** arrancar R2.
 
 ---
 
@@ -387,3 +387,51 @@ Ninguno.
 **Next session**
 
 Crear el branch `dev` en Neon y arrancar R2 — Cronómetro.
+
+---
+
+### Sesión 7 — 25/09/2026 — separación de entornos de base de datos
+
+**Duración:** ~20 min
+**Objetivo:** dejar el entorno local sin acceso de escritura a la base que sirve el despliegue,
+antes de que R2 empiece a registrar sesiones reales.
+
+**What was done**
+
+- Branch `dev` creado en Neon por el usuario.
+- **Corregido el arreglo a medias:** se había agregado `DATABASE_URL_DEV` al `.env`, pero la
+  aplicación lee `DATABASE_URL`, que seguía apuntando a producción. El entorno local seguía
+  escribiendo en la base del despliegue. Ahora `DATABASE_URL` tiene el valor de `dev` y la
+  cadena de producción ya no existe localmente: vive solo en Vercel.
+- `npm run db:push` y `npm run db:seed` verificados contra `dev`, idempotencia comprobada en
+  segunda corrida.
+- `.gitignore` reforzado: el patrón `.env` no cubría archivos como `.env.backup-123`. Ahora
+  `.env.*` con excepción explícita para `.env.example`. Comprobado que `.env.example` sigue
+  rastreado y que un respaldo nuevo se ignora.
+- Documentados en `docs/ARCHITECTURE.md` el esquema de una sola variable por entorno y la
+  **caducidad del branch `dev` el 02/10/2026**, con el síntoma y el procedimiento de
+  recuperación.
+
+**Decisions**
+
+1. Una sola variable `DATABASE_URL` con valor distinto por entorno, no dos variables entre las
+   que el código elija. Meter la decisión de entorno en la aplicación es justo lo que las
+   variables de entorno evitan.
+2. La cadena de producción no se guarda localmente. Con ambas a mano, tarde o temprano se corre
+   una migración contra la que no era.
+
+**Issues**
+
+Durante el cambio se creó un respaldo `.env.backup-*` con la cadena de producción, y el
+`.gitignore` no lo cubría. Nunca llegó a un commit —quedó sin rastrear— y se eliminó. De ahí
+salió el refuerzo del `.gitignore`.
+
+**Hallazgos fuera de alcance**
+
+- Migraciones versionadas siguen pendientes. Ahora urge más: con `dev` y producción separados,
+  `drizzle-kit push` puede dejarlos divergentes sin que nada avise.
+- `plannedSessions` no se captura por la interfaz y `RF-36` lo necesita.
+
+**Next session**
+
+R2 — Cronómetro.
