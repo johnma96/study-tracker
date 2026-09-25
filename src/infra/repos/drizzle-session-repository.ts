@@ -28,7 +28,7 @@ import { isUniqueViolationOf } from '@/infra/db/unique-violation';
 /** Nombre del índice único parcial que impone el invariante 1 (RF-22). */
 export const ONE_RUNNING_SESSION_INDEX = 'one_running_session';
 
-function toDomain(row: SessionRow): Session {
+export function toDomain(row: SessionRow): Session {
   return {
     id: row.id,
     programId: row.programId,
