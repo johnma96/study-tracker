@@ -4,11 +4,10 @@
 
 **Última actualización:** 25/09/2026
 **Feature activa:** ninguna.
-**Estado del repositorio:** R0 a R5 en `passing`. **R6 diferida con riesgo aceptado**, ver
-`RF-40`. Todo empujado.
+**Estado del repositorio:** R0 a R5 y R7 en `passing`. **R6 diferida con riesgo aceptado**
+(ver `RF-40`). Desplegado en <https://study-tracker-eight-sigma.vercel.app/>.
 **Bloqueos:** ninguno. El branch `dev` de Neon **expira el 02/10/2026**.
-**Siguiente paso:** deuda pendiente (`repo_url` para `RF-52`, deduplicar el listado de sesiones)
-o R6 si se cumple alguna de sus condiciones de disparo.
+**Siguiente paso:** el curso. El MVP está completo salvo autenticación.
 
 ---
 
@@ -903,3 +902,59 @@ Ninguno.
 **Next session**
 
 La deuda pendiente, o el curso.
+
+---
+
+### Sesión 13 — 25/09/2026 — R7, limpieza del MVP
+
+**Duración:** ~50 min
+**Objetivo:** cerrar las tres deudas que quedaron tras el abanico, antes de empezar el curso.
+
+**What was done**
+
+1. **`repo_url` en `programs` (RF-52).** Un artefacto guardado como ruta relativa se mostraba
+   como texto porque no había base contra la cual resolverlo. Ahora el programa puede tener la
+   URL de su repositorio y `artifactHref` une las dos. Migración `0003_program_repo_url`,
+   validación en `core`, campo en el formulario y uso en `ArtifactList`.
+2. **Encabezado sin rótulo de rebanada.** Decía «study-tracker · R2 / Cronómetro» con la página
+   ya conteniendo R1 a R5. Ahora dice qué hace la aplicación, que no cambia cada rebanada.
+3. **Redundancia entre R3 y R4 reducida.** La sección de evidencia se retituló «Adjuntar
+   evidencia», remite explícitamente a la tabla de R3 para el detalle, y perdió la insignia de
+   duración que repetía un dato de esa tabla.
+
+**Decisions**
+
+1. **La unión de ruta y base se implementa a mano, no con `new URL(ruta, base)`.** Esa función
+   parece la natural y es una trampa: `new URL('//otro-host.com/x', base)` devuelve
+   `https://otro-host.com/x`, porque una ruta que empieza por `//` es relativa al protocolo y se
+   lleva el enlace a otro servidor. La implementación revalida la ruta con las reglas de guardado
+   y compara el origen final con el de la base. Hay una prueba que documenta el ataque.
+2. **`repoUrl` reutiliza `safeExternalHref` en vez de una regla propia.** Es la misma lista
+   blanca `http`/`https` que gobierna los destinos de artefactos y termina en el mismo sitio, un
+   `href`. Dos definiciones de "URL aceptable" se habrían desincronizado.
+3. **Los dos listados de sesiones no se fusionaron, y es deliberado.** Se evaluó y **no es
+   limpieza sino rediseño**: la tabla de R3 es además la vista accesible del mapa de calor
+   (RF-30), y las tarjetas de R4 llevan cada una su formulario de adjuntar. Eliminar cualquiera
+   rompe algo real. Se redujo la redundancia visual en vez de forzar una fusión.
+
+**Issues**
+
+Ninguno que quedara abierto. Durante el trabajo, tres errores propios de escapado de shell al
+escribir pruebas con rutas de Windows: una coma doble en un `import`, y dos niveles de barras
+invertidas mal contados. El segundo era el peligroso — `'docs
+otas.md'` con una sola barra
+convierte `
+` en un salto de línea y la prueba habría pasado midiendo otra cosa. Se resolvió
+usando `String.raw`, que elimina la ambigüedad de niveles.
+
+**Hallazgos fuera de alcance**
+
+- **Indicar en la tabla de R3 qué sesiones tienen evidencia** sería la mejora natural, pero
+  acopla la sección de R3 al repositorio de R4: cuatro archivos y una consulta nueva. Queda como
+  trabajo propio si la redundancia sigue molestando en uso real.
+- `plannedSessions` sigue sin capturarse por la interfaz y `RF-36` lo necesita.
+- No existe edición ni borrado de programas ni de sesiones.
+
+**Next session**
+
+El curso. El MVP está completo salvo la autenticación, que está diferida con condiciones escritas.

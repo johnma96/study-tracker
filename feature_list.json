@@ -160,6 +160,24 @@
       "verification": "npm run test -- auth, y un navegador sin sesion no puede leer ni escribir nada",
       "evidence": null,
       "testedAt": null
+    },
+    {
+      "id": "R7",
+      "name": "Limpieza del MVP",
+      "description": "Tres deudas agrupadas: repo_url en programs para que RF-52 enlace rutas relativas, quitar el rotulo de rebanada del encabezado, y reducir la redundancia entre el listado de sesiones de R3 y las tarjetas de evidencia de R4.",
+      "requirements": [
+        "RF-50",
+        "RF-52"
+      ],
+      "dependencies": [
+        "R3",
+        "R4",
+        "R5"
+      ],
+      "status": "passing",
+      "verification": "npm run test cubre el armado de enlaces con y sin repo_url y los casos de ruta relativa contra URL absoluta; npm run db:check pasa con la migracion 0003; npm run build OK",
+      "evidence": "npm run test: 281 pruebas en 18 archivos, 17 nuevas (11 de artifactHref y 6 de repoUrl en parseNewProgram). Reversion comprobada revirtiendo artifactHref para que ignore la base del repositorio: caen 3 pruebas de union, vuelven 54/54 al restaurar. npm run test:integration 23/23. npm run check, lint y build sin errores. ./init.sh termina en Init OK. npm run db:check: Everything's fine, con la migracion 0003_program_repo_url. Columna repo_url verificada en el branch dev contra information_schema. Produccion la aplicara vercel-build en el proximo despliegue. Sin verificar en produccion: la VPN corporativa bloquea vercel.app.",
+      "testedAt": "2026-09-25"
     }
   ]
 }

@@ -206,6 +206,51 @@ export function safeExternalHref(target: string): string | null {
 }
 
 /**
+ * R7 (RF-52) — `href` de un artefacto, resolviendo rutas relativas contra la
+ * base del repositorio del programa.
+ *
+ * Es la evolución de `safeExternalHref`, que devuelve `null` para toda ruta
+ * relativa porque sola no tiene contra qué resolverse. Con `repoUrl` sí la
+ * tiene, y `RF-52` —"los artefactos se muestran como enlaces"— se cumple
+ * también para las rutas de repositorio, que antes quedaban como texto.
+ *
+ * **La unión es el punto delicado.** `new URL(ruta, base)` parece lo natural y
+ * es una trampa: `new URL('//otro-host.com/x', 'https://github.com/a/')`
+ * devuelve `https://otro-host.com/x`. Una ruta que empieza por `//` es
+ * *relativa al protocolo*, no al camino, y se lleva el enlace a otro servidor.
+ *
+ * Por eso aquí la ruta se revalida con `validateArtifactTarget` —las mismas
+ * reglas de guardado: sin esquema, sin barra inicial, sin `..`— y al final se
+ * compara el origen resultante con el de la base. Si no coinciden, no hay
+ * enlace. Es el mismo criterio que el resto del archivo: no confiar en que la
+ * fila guardada haya pasado por la validación.
+ */
+export function artifactHref(
+  target: string,
+  repoUrl: string | null | undefined,
+): string | null {
+  // Un destino que ya es una URL web no necesita base: gana siempre.
+  const direct = safeExternalHref(target);
+  if (direct !== null) return direct;
+
+  if (repoUrl === null || repoUrl === undefined || repoUrl.trim() === '') return null;
+
+  const base = parseWebUrl(repoUrl.trim());
+  if (base === null || base.username !== '' || base.password !== '') return null;
+
+  // Revalidar la ruta con las reglas de guardado, sin confiar en la fila.
+  const check = validateArtifactTarget(target);
+  if (!check.ok || check.form !== 'path') return null;
+
+  const joined = parseWebUrl(`${base.href.replace(/\/+$/, '')}/${check.target}`);
+
+  // Última red: el enlace no puede haberse ido a otro servidor.
+  if (joined === null || joined.origin !== base.origin) return null;
+
+  return joined.href;
+}
+
+/**
  * RF-53 — origen de la miniatura, o `null` si no corresponde mostrarla.
  *
  * Solo un artefacto de tipo `image` cuyo destino sea una URL web. "Accesible"

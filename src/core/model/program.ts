@@ -45,6 +45,11 @@ export interface Program {
   startedAt: string | null;
   targetAt: string | null;
   plannedSessions: number | null;
+  /**
+   * R7 — URL base del repositorio, opcional. Resuelve las rutas relativas de
+   * los artefactos a enlaces reales (RF-52). Ver `services/artifact-target.ts`.
+   */
+  repoUrl: string | null;
   createdAt: Date;
 }
 
@@ -63,4 +68,6 @@ export interface NewProgram {
   status: ProgramStatus;
   startedAt: string | null;
   targetAt: string | null;
+  /** R7 — opcional. Sin ella, las rutas relativas siguen mostrándose como texto. */
+  repoUrl: string | null;
 }

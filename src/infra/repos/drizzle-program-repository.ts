@@ -31,6 +31,7 @@ function toDomain(row: ProgramRow): Program {
     startedAt: row.startedAt,
     targetAt: row.targetAt,
     plannedSessions: row.plannedSessions,
+    repoUrl: row.repoUrl,
     createdAt: row.createdAt,
   };
 }

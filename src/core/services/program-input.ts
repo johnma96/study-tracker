@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { safeExternalHref } from './artifact-target';
+
 import {
   PROGRAM_KINDS,
   PROGRAM_STATUSES,
@@ -89,6 +91,30 @@ const programStatusField = z
   .transform((value) => value as ProgramStatus);
 
 /** RF-10 — campos exactos que enumera el requerimiento. */
+/**
+ * R7 — URL base del repositorio del programa, opcional.
+ *
+ * Reutiliza `safeExternalHref` en vez de una regla propia: es la misma lista
+ * blanca `http`/`https` que ya gobierna los destinos de artefactos, y esta URL
+ * termina exactamente en el mismo sitio, dentro de un `href`. Una segunda
+ * definición de "URL aceptable" en este archivo se desincronizaría con la otra.
+ *
+ * Se guarda la forma normalizada que devuelve `URL`, no lo que escribió el
+ * usuario, para que lo almacenado sea lo que se presenta.
+ */
+const optionalRepoUrlField = z
+  .string()
+  .transform((value) => value.trim())
+  .superRefine((value, ctx) => {
+    if (value === '' || safeExternalHref(value) !== null) return;
+
+    ctx.addIssue({
+      code: 'custom',
+      message: 'La URL del repositorio debe empezar por http:// o https:// y no llevar clave.',
+    });
+  })
+  .transform((value) => (value === '' ? null : safeExternalHref(value)));
+
 const newProgramSchema = z.object({
   name: programNameField,
   provider: optionalTextField,
@@ -96,6 +122,7 @@ const newProgramSchema = z.object({
   status: programStatusField,
   startedAt: optionalCivilDateField,
   targetAt: optionalCivilDateField,
+  repoUrl: optionalRepoUrlField,
 });
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -160,6 +187,7 @@ export function parseNewProgram(raw: RawInput): ParseResult<NewProgram> {
     status: text(raw, 'status'),
     startedAt: text(raw, 'startedAt'),
     targetAt: text(raw, 'targetAt'),
+    repoUrl: text(raw, 'repoUrl'),
   });
 
   return parsed.success

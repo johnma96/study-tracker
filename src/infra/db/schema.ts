@@ -37,11 +37,30 @@ export const programs = pgTable(
     startedAt: date('started_at'),
     targetAt: date('target_at'),
     plannedSessions: integer('planned_sessions'),
+    /**
+     * R7 — URL base del repositorio del programa, opcional.
+     *
+     * Existe por RF-52: un artefacto cuyo `target` es una ruta relativa no se
+     * podía enlazar, porque un `href` relativo apuntaría a esta aplicación y no
+     * al repositorio. Con esta base, la ruta se une y el enlace funciona; sin
+     * ella, la ruta se sigue mostrando como texto.
+     *
+     * El CHECK repite en el motor la lista blanca `http`/`https` que ya aplica
+     * `core/services`: esta columna termina construyendo un `href`, y una base
+     * con esquema `javascript:` convertiría cada ruta relativa en un enlace
+     * ejecutable. Es defensa en profundidad, no duplicación gratuita.
+     */
+    repoUrl: text('repo_url'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
     // RF-14 — el nombre es obligatorio y no supera 120 caracteres.
     check('programs_name_length', sql`char_length(${table.name}) between 1 and 120`),
+    // R7 — la base del repositorio, si existe, es http o https y no va vacía.
+    check(
+      'programs_repo_url_scheme',
+      sql`${table.repoUrl} is null or ${table.repoUrl} ~* '^https?://.{1,2040}$'`,
+    ),
     // RF-11
     check(
       'programs_kind_valid',

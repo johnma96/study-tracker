@@ -115,18 +115,23 @@ aplica todas.
 
 ## Next Session
 
-Recommended Next Step: **R6 — Autenticación** (RF-40 a RF-44), antes de empujar y de cargar
-datos reales.
+**El MVP está completo salvo la autenticación.** R0 a R5 y R7 en `passing`; R6 diferida con
+riesgo aceptado y condiciones escritas en `RF-40`.
 
-- Auth.js con un proveedor OAuth y lista blanca por variable de entorno (`ALLOWED_EMAILS`, ya
-  documentada en `.env.example`).
-- Verificación ejecutable: `curl` sin credenciales contra una ruta de lectura y contra una
-  Server Action devuelve 401 o 403. Eso incluye las nuevas acciones de evidencia y de métricas.
-  Una prueba cubre RF-42.
-- Tras R6, empujar y vigilar el primer `vercel-build`, que aplica las tres migraciones.
+Recommended Next Step: **el curso de harness engineering**. El tracker ya puede registrar su
+propia primera sesión: cronometra, guarda, muestra totales y evidencia, y grafica métricas.
 
-Candidatos pequeños para después de R6, registrados en `progress.md`:
-- consolidar las lecturas de sesiones;
-- guardia automática de capas para `core/`;
-- edición y borrado de artefactos y lecturas;
-- capturar `planned_sessions` en el formulario de programas.
+Antes de la próxima sesión de trabajo, dos cosas de mantenimiento:
+
+1. **Confirmar el despliegue.** El próximo `git push` lleva la migración `0003` a producción por
+   `vercel-build`. En el registro del build debe aparecer `migrations applied successfully`.
+2. **El branch `dev` de Neon expira el 02/10/2026.** Procedimiento de recuperación en
+   `docs/ARCHITECTURE.md`.
+
+Si se retoma el producto en vez del curso, la deuda pendiente, por orden de valor:
+
+- **Indicar en la tabla de R3 qué sesiones tienen evidencia.** Es la mejora natural tras R7, pero
+  acopla la sección de R3 al repositorio de R4: cuatro archivos y una consulta nueva.
+- `plannedSessions` no se captura por la interfaz y `RF-36` lo necesita para proyectar.
+- No hay edición ni borrado de programas ni de sesiones.
+- **R6**, si se cumple alguna de las cuatro condiciones de `RF-40`.

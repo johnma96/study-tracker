@@ -1,5 +1,5 @@
 import type { Artifact } from '@/core/model/artifact';
-import { safeExternalHref, thumbnailSrc } from '@/core/services/artifact-target';
+import { artifactHref, thumbnailSrc } from '@/core/services/artifact-target';
 import { ARTIFACT_KIND_LABELS } from '@/ui/artifact-labels';
 import { ArtifactThumbnail } from '@/ui/artifact-thumbnail';
 import { Badge } from '@/ui/primitives/badge';
@@ -18,11 +18,19 @@ import { Badge } from '@/ui/primitives/badge';
  * para que la página de destino no pueda manipular esta con `window.opener` ni
  * reciba la URL de origen.
  *
- * Una ruta relativa de repositorio se muestra como texto: sin la URL base del
- * repositorio no hay a dónde enlazarla, y un `href` relativo apuntaría a esta
- * misma aplicación.
+ * R7 — una ruta relativa de repositorio **sí** se enlaza cuando el programa
+ * tiene `repoUrl`: `artifactHref` la resuelve contra esa base. Sin base sigue
+ * mostrándose como texto, porque un `href` relativo apuntaría a esta misma
+ * aplicación y no al repositorio.
  */
-export function ArtifactList({ artifacts }: { artifacts: readonly Artifact[] }) {
+export function ArtifactList({
+  artifacts,
+  repoUrl,
+}: {
+  artifacts: readonly Artifact[];
+  /** Base del repositorio del programa de la sesión, si la tiene (R7). */
+  repoUrl?: string | null;
+}) {
   if (artifacts.length === 0) {
     return <p className="text-sm text-muted-foreground">Sin evidencia adjunta todavía.</p>;
   }
@@ -30,7 +38,7 @@ export function ArtifactList({ artifacts }: { artifacts: readonly Artifact[] }) 
   return (
     <ul className="flex flex-col gap-3">
       {artifacts.map((artifact) => {
-        const href = safeExternalHref(artifact.target);
+        const href = artifactHref(artifact.target, repoUrl);
         const thumbnail = thumbnailSrc(artifact);
 
         return (

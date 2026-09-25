@@ -3,7 +3,6 @@ import type { SessionType } from '@/core/model/session-type';
 import type { SessionEvidence as SessionEvidenceItem } from '@/core/ports/artifact-repository';
 import { effectiveMinutes } from '@/core/services/session-duration';
 import { toCivilDateInAppZone, toCivilTimeInAppZone } from '@/core/services/timezone';
-import { Badge } from '@/ui/primitives/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/ui/primitives/card';
 import { SessionArtifacts } from '@/ui/session-artifacts';
 
@@ -50,17 +49,20 @@ export function SessionEvidence({
   sessionTypes: readonly SessionType[];
 }) {
   const programNames = new Map(programs.map((program) => [program.id, program.name]));
+  // R7 — la base del repositorio por programa, para enlazar rutas relativas (RF-52).
+  const repoUrls = new Map(programs.map((program) => [program.id, program.repoUrl]));
   const typesById = new Map(sessionTypes.map((sessionType) => [sessionType.id, sessionType]));
 
   return (
     <section className="flex flex-col gap-4" aria-labelledby="evidence-heading">
       <div>
         <h2 id="evidence-heading" className="text-xl font-semibold">
-          Evidencia de las sesiones recientes
+          Adjuntar evidencia
         </h2>
         <p className="mt-1 text-sm opacity-70">
           Enlaza lo que produjo cada sesión: el documento, el commit, la captura. Se guarda la
-          referencia, nunca el archivo.
+          referencia, nunca el archivo. El detalle de las sesiones —duración, tipo, nota— está
+          arriba, en «Totales y mapa de calor».
         </p>
       </div>
 
@@ -79,12 +81,13 @@ export function SessionEvidence({
           return (
             <Card key={item.session.id} size="sm">
               <CardHeader>
-                <CardTitle className="flex flex-wrap items-center gap-2">
-                  {heading.program}
-                  <Badge variant={item.session.endedAt === null ? 'default' : 'secondary'}>
-                    {heading.duration}
-                  </Badge>
-                </CardTitle>
+                {/*
+                  R7 — sin insignia de duración: ese dato ya está en la tabla de
+                  R3 y verlo dos veces hacía que las dos secciones se leyeran
+                  como listados repetidos. Aquí solo queda lo justo para
+                  identificar a qué sesión se adjunta.
+                */}
+                <CardTitle>{heading.program}</CardTitle>
                 <CardDescription>
                   {heading.when}
                   {heading.type ? ` · ${heading.type}` : ''}
@@ -92,7 +95,11 @@ export function SessionEvidence({
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <SessionArtifacts sessionId={item.session.id} artifacts={item.artifacts} />
+                <SessionArtifacts
+                  sessionId={item.session.id}
+                  artifacts={item.artifacts}
+                  repoUrl={repoUrls.get(item.session.programId) ?? null}
+                />
               </CardContent>
             </Card>
           );

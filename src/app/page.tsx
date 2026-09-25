@@ -73,13 +73,19 @@ export default async function Home() {
   return (
     <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-10 px-6 py-16">
       <header>
-        <p className="font-mono text-xs uppercase tracking-widest opacity-60">
-          study-tracker · R2
-        </p>
-        <h1 className="mt-2 text-3xl font-bold">Cronómetro</h1>
+        {/*
+          R7 — el encabezado **no** nombra la rebanada en curso. Decía
+          "study-tracker · R2 / Cronómetro" cuando la página ya contenía R1 a
+          R5: un rótulo que declara estado y se queda viejo, el mismo defecto
+          que tuvieron CLAUDE.md y README.md. El título dice qué hace la
+          aplicación, que no cambia con cada rebanada.
+        */}
+        <p className="font-mono text-xs uppercase tracking-widest opacity-60">study-tracker</p>
+        <h1 className="mt-2 text-3xl font-bold">Sesiones de estudio</h1>
         <p className="mt-2 text-sm opacity-70">
-          El tiempo transcurrido se calcula desde la marca de inicio guardada en la base. Puedes
-          cerrar la pestaña: al volver, la sesión sigue corriendo con el tiempo correcto.
+          Cronometra, registra la evidencia y mide el avance de cada programa. El tiempo se
+          calcula desde la marca de inicio guardada en la base: puedes cerrar la pestaña y al
+          volver la sesión sigue corriendo con el tiempo correcto.
         </p>
       </header>
 

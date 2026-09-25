@@ -1,0 +1,2 @@
+ALTER TABLE "programs" ADD COLUMN "repo_url" text;--> statement-breakpoint
+ALTER TABLE "programs" ADD CONSTRAINT "programs_repo_url_scheme" CHECK ("programs"."repo_url" is null or "programs"."repo_url" ~* '^https?://.{1,2040}$');

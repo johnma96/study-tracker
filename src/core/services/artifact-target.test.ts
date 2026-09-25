@@ -5,6 +5,7 @@ import {
   safeExternalHref,
   thumbnailSrc,
   validateArtifactTarget,
+  artifactHref,
 } from './artifact-target';
 
 /**
@@ -202,5 +203,64 @@ describe('thumbnailSrc (RF-53)', () => {
 
   it('no usa como src un esquema que no sea web', () => {
     expect(thumbnailSrc({ kind: 'image', target: 'javascript:alert(1)' })).toBeNull();
+  });
+});
+
+describe('artifactHref — R7, RF-52: rutas relativas resueltas contra repoUrl', () => {
+  const base = 'https://github.com/johnma96/study-tracker';
+
+  it('una URL web gana siempre y no necesita base', () => {
+    expect(artifactHref('https://ejemplo.com/a', null)).toBe('https://ejemplo.com/a');
+    expect(artifactHref('https://ejemplo.com/a', base)).toBe('https://ejemplo.com/a');
+  });
+
+  it('une la ruta relativa a la base del repositorio', () => {
+    expect(artifactHref('docs/ROADMAP.md', base)).toBe(
+      'https://github.com/johnma96/study-tracker/docs/ROADMAP.md',
+    );
+  });
+
+  it('no duplica la barra cuando la base termina en una', () => {
+    expect(artifactHref('docs/a.md', `${base}/`)).toBe(
+      'https://github.com/johnma96/study-tracker/docs/a.md',
+    );
+  });
+
+  it('normaliza las barras invertidas de Windows', () => {
+    expect(artifactHref(String.raw`docs\notas\a.md`, base)).toBe(
+      'https://github.com/johnma96/study-tracker/docs/notas/a.md',
+    );
+  });
+
+  it('sin base, una ruta relativa sigue sin ser enlace', () => {
+    expect(artifactHref('docs/ROADMAP.md', null)).toBeNull();
+    expect(artifactHref('docs/ROADMAP.md', undefined)).toBeNull();
+    expect(artifactHref('docs/ROADMAP.md', '   ')).toBeNull();
+  });
+
+  it('rechaza una base que no sea http o https', () => {
+    expect(artifactHref('docs/a.md', 'javascript:alert(1)')).toBeNull();
+    expect(artifactHref('docs/a.md', 'ftp://servidor/x')).toBeNull();
+    expect(artifactHref('docs/a.md', 'no-es-una-url')).toBeNull();
+  });
+
+  it('rechaza una base con credenciales embebidas', () => {
+    expect(artifactHref('docs/a.md', 'https://user:clave@github.com/x')).toBeNull();
+  });
+
+  // El caso que motiva la implementacion manual en vez de `new URL(ruta, base)`.
+  it('no deja que una ruta protocolo-relativa se lleve el enlace a otro host', () => {
+    expect(artifactHref('//host-malicioso.com/x', base)).toBeNull();
+    expect(new URL('//host-malicioso.com/x', base).host).toBe('host-malicioso.com');
+  });
+
+  it('rechaza rutas que salen del repositorio o son absolutas', () => {
+    expect(artifactHref('../fuera.md', base)).toBeNull();
+    expect(artifactHref('/etc/passwd', base)).toBeNull();
+    expect(artifactHref(String.raw`C:\Users\x.md`, base)).toBeNull();
+  });
+
+  it('rechaza un destino con esquema peligroso aunque haya base', () => {
+    expect(artifactHref('javascript:alert(1)', base)).toBeNull();
   });
 });

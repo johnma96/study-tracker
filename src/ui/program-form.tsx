@@ -60,6 +60,25 @@ export function ProgramForm() {
         <FieldError message={state.fieldErrors.provider} />
       </div>
 
+      <div>
+        <label htmlFor="repoUrl" className="block text-sm font-medium">
+          URL del repositorio
+        </label>
+        <input
+          id="repoUrl"
+          name="repoUrl"
+          type="url"
+          inputMode="url"
+          placeholder="https://github.com/usuario/repositorio"
+          className={inputClass}
+        />
+        <p className="mt-1 text-xs opacity-70">
+          Opcional. Con ella, la evidencia guardada como ruta relativa se vuelve un enlace al
+          archivo; sin ella se muestra como texto.
+        </p>
+        <FieldError message={state.fieldErrors.repoUrl} />
+      </div>
+
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
           <label htmlFor="kind" className="block text-sm font-medium">

@@ -34,6 +34,7 @@ describe('parseNewProgram — camino feliz (RF-10)', () => {
       status: 'active',
       startedAt: '2026-09-24',
       targetAt: '2026-12-31',
+      repoUrl: null,
     });
   });
 
@@ -59,6 +60,7 @@ describe('parseNewProgram — camino feliz (RF-10)', () => {
       'kind',
       'name',
       'provider',
+      'repoUrl',
       'startedAt',
       'status',
       'targetAt',
@@ -160,5 +162,44 @@ describe('parseNewSessionType — RF-15 en el servidor', () => {
     expect(
       parseNewSessionType({ programId, code: 'E', label: '  ' }),
     ).toMatchObject({ ok: false });
+  });
+});
+
+describe('parseNewProgram — repoUrl (R7, RF-52)', () => {
+  it('acepta una URL http o https y la guarda normalizada', () => {
+    const result = parseNewProgram({ ...valid, repoUrl: 'HTTPS://GitHub.com/johnma96/study-tracker' });
+
+    expect(result.ok && result.value.repoUrl).toBe('https://github.com/johnma96/study-tracker');
+  });
+
+  it('en blanco queda nulo: el campo es opcional', () => {
+    expect(parseNewProgram({ ...valid, repoUrl: '' }).ok).toBe(true);
+    expect(parseNewProgram({ ...valid, repoUrl: '   ' }).ok).toBe(true);
+
+    const result = parseNewProgram({ ...valid, repoUrl: '   ' });
+    expect(result.ok && result.value.repoUrl).toBeNull();
+  });
+
+  it('ausente se trata como en blanco, no como error de forma', () => {
+    const { repoUrl: _omitido, ...sinCampo } = { ...valid, repoUrl: '' };
+    const result = parseNewProgram(sinCampo);
+
+    expect(result.ok && result.value.repoUrl).toBeNull();
+  });
+
+  // La base termina dentro de un href: un esquema peligroso convertiria cada
+  // ruta relativa del programa en un enlace ejecutable.
+  it('rechaza un esquema fuera de la lista blanca', () => {
+    for (const malo of ['javascript:alert(1)', 'ftp://servidor/x', 'no-es-una-url']) {
+      const result = parseNewProgram({ ...valid, repoUrl: malo });
+      expect(result.ok).toBe(false);
+      expect(!result.ok && result.fieldErrors.repoUrl).toBeDefined();
+    }
+  });
+
+  it('rechaza una URL con credenciales embebidas', () => {
+    const result = parseNewProgram({ ...valid, repoUrl: 'https://user:clave@github.com/x' });
+
+    expect(result.ok).toBe(false);
   });
 });

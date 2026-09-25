@@ -17,13 +17,16 @@ import { ArtifactList } from '@/ui/artifact-list';
 export function SessionArtifacts({
   sessionId,
   artifacts,
+  repoUrl,
 }: {
   sessionId: string;
   artifacts: readonly Artifact[];
+  /** R7 — base del repositorio del programa, para enlazar rutas relativas. */
+  repoUrl?: string | null;
 }) {
   return (
     <div className="flex flex-col gap-4">
-      <ArtifactList artifacts={artifacts} />
+      <ArtifactList artifacts={artifacts} repoUrl={repoUrl} />
       <div className="border-t border-border pt-4">
         <ArtifactForm sessionId={sessionId} />
       </div>
