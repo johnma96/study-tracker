@@ -142,6 +142,82 @@ Auth.js con un proveedor OAuth y lista blanca por variable de entorno.
   la base solo tenga datos de prueba puede esperar. En el momento en que registre sesiones
   reales que te importe perder o exponer, es obligatoria antes del siguiente despliegue.
 
+## Paralelización de R3, R4 y R5
+
+R3, R4 y R5 dependen de R2 pero **no entre sí**. Es el único punto del MVP donde el abanico es
+legítimo, y por eso se hace aquí.
+
+```
+R0 → R1 → R2 ─┬─→ R3  totales y mapa de calor   (sin tablas nuevas)
+              ├─→ R4  evidencia                  (tabla artifacts)
+              └─→ R5  métricas                   (tablas metrics, readings)
+```
+
+> **Vertical no significa independiente.** Todas las rebanadas son verticales —atraviesan base
+> de datos, dominio e interfaz—, pero solo estas tres son independientes entre sí. R1 y R2 son
+> verticales y encadenadas: `sessions` referencia a `programs`, así que paralelizarlas es
+> imposible. Solo la independencia habilita el abanico.
+
+### Preparación, en serie, antes de abrir el abanico
+
+Estos tres pasos **no se pueden repartir**: si cada agente los hace por su cuenta, colisionan.
+
+| # | Paso | Por qué en serie |
+|---|---|---|
+| 1 | Instalar **shadcn/ui y Recharts** en `main` y commitear | Es infraestructura de interfaz compartida. Tres `shadcn init` en paralelo se pisan en `package.json`, `components.json` y los estilos |
+| 2 | Crear en Neon **tres branches desde `dev`**: `dev-r3`, `dev-r4`, `dev-r5` | El índice `one_running_session` es global: la sesión que crea la prueba de integración de un agente **hace fallar las de los otros dos**. Sin bases separadas, las pruebas se vuelven inestables sin motivo aparente |
+| 3 | Crear tres worktrees | Aislamiento de archivos |
+
+```bash
+git worktree add ../study-tracker-r3 -b r3-totales
+git worktree add ../study-tracker-r4 -b r4-evidencia
+git worktree add ../study-tracker-r5 -b r5-metricas
+```
+
+Cada worktree necesita su **propio `npm install`** —`node_modules` no se comparte— y su propio
+`.env` con la cadena de **su** branch de Neon. Ese costo es parte de lo que hay que medir: si
+tres `npm install` y tres branches cuestan más que hacerlo en serie, el abanico no valió la pena.
+
+### Reglas para los tres agentes
+
+- Cada uno trabaja **solo** en su worktree y contra **su** branch de Neon.
+- Cada uno toca **únicamente su propia entrada** de `feature_list.json`. Nada más de ese archivo.
+- **Ninguno reescribe `session-handoff.md`.** Es un archivo de un solo escritor: tres reescrituras
+  completas garantizan conflicto. Cada agente deja sus hallazgos en `notas-rN.md` en la raíz de su
+  worktree, y quien integra los consolida en `progress.md`.
+- Cada uno commitea en su rama. **Ninguno empuja.**
+
+### Integración, en serie: R3 → R4 → R5
+
+El orden no es arbitrario:
+
+1. **R3 primero** porque no agrega tablas: no genera migración y por tanto no compite por la
+   numeración.
+2. **R4 después.** Genera `0001_*` para `artifacts`.
+3. **R5 al final.** También querría generar `0001_*`. Tras integrar R4 ese número ya existe, así
+   que **hay que borrar su migración y volver a generarla** con `npm run db:generate` para que
+   salga `0002_*`. Es el conflicto más fácil de resolver mal: si se fusionan dos archivos `0001`,
+   el historial de migraciones queda corrupto y `npm run db:check` lo detecta.
+
+Después de **cada** integración: `npm run db:check`, `npm run db:migrate` contra `dev`,
+`npm run test` y `npm run test:integration`.
+
+### Conflictos esperados
+
+| Archivo | Por qué choca | Cómo se resuelve |
+|---|---|---|
+| `src/infra/db/migrations/` | R4 y R5 generan ambos `0001_*` | R5 regenera tras integrar R4 |
+| `feature_list.json` | Los tres actualizan su estado | Cada agente toca solo su bloque; el conflicto es mecánico |
+| `progress.md` | Los tres querrían escribir | Solo escribe quien integra, desde las `notas-rN.md` |
+| `src/app/page.tsx` | Los tres agregan interfaz | Probable y real: conviene que cada uno monte su sección en un componente propio de `src/ui/` y toque `page.tsx` lo mínimo |
+
+### Qué se está midiendo
+
+Esto no es solo una forma de ir más rápido: es el **Experimento 2 del Proyecto 08** del curso,
+hecho sobre código propio. La pregunta a responder al final, con datos y no con impresión:
+**¿el tiempo ahorrado compensó el costo de coordinación?** Registra en `progress.md` el tiempo de
+preparación, el de cada agente, el de integración y cuántos conflictos hubo.
+
 ## Fuera del MVP
 
 Ver la lista vinculante en `docs/PRODUCT.md`. No la amplíes sin decisión explícita.

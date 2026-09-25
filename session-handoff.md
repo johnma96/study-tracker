@@ -116,45 +116,87 @@ crea el índice único, y sin él la aplicación parece sana y admite dos sesion
 
 ## Next Session
 
-**Antes de nada, el commit de infraestructura está hecho pero sin empujar.** Al empujarlo,
-Vercel hará esto, en este orden:
+Recommended Next Step: **abrir el abanico de R3, R4 y R5 en paralelo.**
 
-1. Instala dependencias, **incluidas las de desarrollo**, así que `drizzle-kit` está
-   disponible.
-2. Ve el script `vercel-build` en `package.json` y lo ejecuta **en lugar de** `build`.
-3. `drizzle-kit migrate` se conecta con la `DATABASE_URL` del entorno de Vercel —el branch
-   principal— y aplica `0000_baseline`. Como la base ya tiene el esquema, **no cambia nada**:
-   crea el esquema `drizzle`, inserta una fila de control y termina con
-   `migrations applied successfully`.
-4. Si ese paso fallara, el build se detiene ahí, `next build` **no llega a ejecutarse** y
-   Vercel conserva el despliegue anterior. Está comprobado en local con una cadena inválida.
-5. `next build` construye y el despliegue sale a producción como siempre.
+El plan completo, con su justificación y la tabla de conflictos esperados, está en
+`docs/ROADMAP.md`, sección **"Paralelización de R3, R4 y R5"**. Léelo antes de empezar: aquí va
+solo la secuencia de ejecución.
 
-De ahí en adelante, cada despliegue aplica las migraciones pendientes antes de construir.
+### Por qué aquí sí y antes no
 
-Recommended Next Step: **R3 — Totales y mapa de calor**, por dos razones: es la que hace
-visibles las sesiones que R2 ya guarda (`RF-30`), y es donde entra `shadcn/ui` y Recharts, que
-el resto de rebanadas van a reutilizar. R4 y R5 califican igual si se prefiere otro orden.
+R3, R4 y R5 dependen de R2 pero no entre sí. R1 y R2 eran verticales igual que estas, pero
+encadenadas —`sessions` referencia a `programs`—, así que paralelizarlas era imposible. Vertical
+no significa independiente; solo la independencia habilita el abanico.
 
-1. `cd study-tracker` y confirmar con `pwd`. No trabajar desde el repositorio del curso: la
-   terminal tiende a reposicionarse ahí sola.
-2. `./init.sh` — debe terminar en "Init OK" y ejecutar las 118 pruebas.
-3. `npm run db:migrate` — no debería haber nada pendiente. Si falla por conexión, el branch
-   caducó: ver *Blockers*.
-4. `npm run test:integration` — 8 pruebas contra `dev`.
-5. Poner la feature elegida en `active` antes de escribir código, y dejarla en `passing` o
-   `blocked` al cerrar.
-6. **Si la rebanada toca `src/infra/db/schema.ts`** —R4 y R5 lo harán, con `artifacts`,
-   `metrics` y `readings`— correr `npm run db:generate`, **leer el `.sql` que salga** y subirlo
-   en el mismo commit. Leerlo no es ceremonia: es donde se comprueba que no se perdió ninguna
-   restricción por el camino.
-7. Para R3, la trampa conocida ya tiene herramienta: `toCivilDateInAppZone` de
-   `src/core/services/timezone.ts` convierte a `America/Bogota` y está probada con el caso de
-   las 23:40. Agrupar por `started_at::date` sin convertir es el error silencioso más probable
-   del modelo.
-8. Corregir el campo `verification` de la rebanada que se abra: los de R3 a R6 todavía mezclan
-   verificación ejecutable y confirmación humana en una sola frase.
-9. Cerrar según el procedimiento "End of Session" de `AGENTS.md`.
+### Paso 0 — preparación, en serie. No se reparte
 
-Recordatorio de alcance: `metrics` y `readings` son de **R5**; la autenticación, de **R6**, que
-es compuerta y no etapa final.
+Si cada agente hace estos pasos por su cuenta, colisionan.
+
+1. **En `main`, instalar shadcn/ui y Recharts**, y commitear. Es infraestructura de interfaz
+   compartida: tres `shadcn init` en paralelo se pisan.
+2. **Crear en Neon tres branches desde `dev`**: `dev-r3`, `dev-r4`, `dev-r5`. Requiere la consola,
+   lo hace el usuario.
+
+   > Esto no es higiene opcional. El índice `one_running_session` es **global**: la sesión que
+   > crea la prueba de integración de un agente hace fallar las de los otros dos. Con una sola
+   > base, las pruebas fallan de forma intermitente y sin causa aparente.
+
+3. **Crear los tres worktrees:**
+
+   ```bash
+   git worktree add ../study-tracker-r3 -b r3-totales
+   git worktree add ../study-tracker-r4 -b r4-evidencia
+   git worktree add ../study-tracker-r5 -b r5-metricas
+   ```
+
+   Cada uno necesita su propio `npm install` y su propio `.env` con la cadena de **su** branch.
+
+### Paso 1 — los tres agentes, en paralelo
+
+| Agente | Rebanada | Requerimientos | Worktree | Branch de Neon |
+|---|---|---|---|---|
+| A | R3 Totales y mapa de calor | `RF-30`…`RF-37` | `../study-tracker-r3` | `dev-r3` |
+| B | R4 Evidencia | `RF-50`…`RF-54` | `../study-tracker-r4` | `dev-r4` |
+| C | R5 Métricas | `RF-60`…`RF-63` | `../study-tracker-r5` | `dev-r5` |
+
+Reglas que van en el encargo de **cada** agente:
+
+- Trabaja solo en tu worktree y contra tu branch de Neon.
+- Toca **únicamente tu propia entrada** de `feature_list.json`.
+- **No reescribas `session-handoff.md`.** Es de un solo escritor. Deja tus hallazgos en
+  `notas-rN.md` en la raíz de tu worktree.
+- Monta tu interfaz en un componente propio de `src/ui/` y toca `src/app/page.tsx` lo mínimo:
+  es el archivo con más probabilidad de conflicto.
+- Commitea en tu rama. **No empujes.**
+- Sigue el resto de `AGENTS.md` como siempre, incluido el cierre de sesión.
+
+### Paso 2 — integración, en serie: R3 → R4 → R5
+
+El orden importa:
+
+1. **R3 primero**: no agrega tablas, no genera migración, no compite por la numeración.
+2. **R4 después**: genera `0001_*` para `artifacts`.
+3. **R5 al final**: también generaría `0001_*`. Tras integrar R4 ese número ya existe, así que
+   **hay que borrar su migración y regenerarla** con `npm run db:generate` para que salga
+   `0002_*`. Fusionar dos archivos `0001` corrompe el historial; `npm run db:check` lo detecta.
+
+Después de **cada** integración: `npm run db:check`, `npm run db:migrate` contra `dev`,
+`npm run test` y `npm run test:integration`.
+
+Al final, quien integra consolida las tres `notas-rN.md` en `progress.md`, reescribe este archivo
+y limpia los worktrees con `git worktree remove`.
+
+### Lo que hay que medir
+
+Este abanico es además el **Experimento 2 del Proyecto 08** del curso, hecho sobre código propio.
+Registra en `progress.md`: tiempo de preparación, tiempo de cada agente, tiempo de integración y
+número de conflictos. La pregunta a responder con datos, no con impresión: **¿el tiempo ahorrado
+compensó el costo de coordinación?**
+
+Un resultado negativo es un resultado válido y vale tanto como uno positivo.
+
+### Si prefieres no paralelizar
+
+R3, R4 y R5 en serie funcionan igual de bien y sin nada de esta coordinación. El orden sugerido
+sería R3 primero, porque hace visibles las sesiones que R2 ya guarda (`RF-30`) y porque trae la
+infraestructura de interfaz que las otras dos reutilizan.

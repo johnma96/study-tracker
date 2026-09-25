@@ -3,16 +3,12 @@
 ## Current State
 
 **Última actualización:** 25/09/2026
-**Feature activa:** ninguna.
-**Estado del repositorio:** R0, R1 y R2 en `passing`. El MVP ya cronometra y guarda sesiones,
-que era el criterio de corte de `docs/ROADMAP.md`: a partir de aquí todo es visualización sobre
-datos que ya se capturan. Desplegado en <https://study-tracker-eight-sigma.vercel.app/>.
-**Bloqueos:** ninguno. Branch `dev` de Neon en uso; **expira el 02/10/2026**.
-**Esquema:** migraciones versionadas desde el 25/09/2026 (sesión 9). `drizzle-kit push` quedó
-retirado a `db:push:emergency`; Vercel aplica el esquema en el build vía `vercel-build`.
-**Siguiente paso:** R3, R4 o R5, en cualquier orden — son independientes entre sí. Antes,
-confirmar el despliegue de R2 desde un dispositivo fuera de la red corporativa, y comprobar en
-el registro del primer build de Vercel que aparece `migrations applied successfully`.
+**Feature activa:** ninguna. Siguen R3, R4 y R5, previstas **en paralelo**.
+**Estado del repositorio:** R0, R1 y R2 en `passing`. Migraciones versionadas en marcha.
+Desplegado en <https://study-tracker-eight-sigma.vercel.app/>.
+**Bloqueos:** ninguno. El branch `dev` de Neon **expira el 02/10/2026**.
+**Siguiente paso:** el Paso 0 de `session-handoff.md` — infraestructura de interfaz, tres
+branches de Neon y tres worktrees. En serie, no se reparte.
 
 ---
 
@@ -653,3 +649,56 @@ Registradas como 18 a 21 en `docs/ARCHITECTURE.md`.
 R3, R4 o R5, en cualquier orden. Antes, confirmar el despliegue de R2 desde un dispositivo
 fuera de la red corporativa y comprobar en el registro del primer build de Vercel que aparece
 `migrations applied successfully`.
+
+---
+
+### Sesión 10 — 25/09/2026 — plan de paralelización, escrito
+
+**Duración:** ~20 min
+**Objetivo:** dejar el plan del abanico en el repositorio, no en una conversación.
+
+**What was done**
+
+El plan de paralelizar R3, R4 y R5 existía solo en la conversación de tutoría: **aparecía cero
+veces en el repositorio**. Una sesión nueva habría leído el handoff anterior y hecho R3 sola, en
+serie, sin enterarse. Ahora vive en `docs/ROADMAP.md` (justificación y conflictos) y en
+`session-handoff.md` (secuencia ejecutable).
+
+Tres colisiones que se resolvieron antes de escribirlo, y que ninguna sesión nueva podría haber
+deducido por su cuenta:
+
+1. **Base de datos compartida.** El índice `one_running_session` es global: la sesión que crea la
+   prueba de integración de un agente hace fallar las de los otros dos. Se resuelve con un branch
+   de Neon por worktree. Sin esto, las pruebas fallan de forma intermitente y sin causa aparente.
+2. **Numeración de migraciones.** R4 y R5 agregan tablas y ambos generarían `0001_*`. Se resuelve
+   integrando en orden R3 → R4 → R5 y regenerando la migración de R5 después de integrar R4.
+3. **Infraestructura de interfaz compartida.** shadcn/ui y Recharts no están instalados. Tres
+   `shadcn init` en paralelo se pisan, así que se instala antes, en serie.
+
+También se identificaron los archivos de un solo escritor —`session-handoff.md`, `progress.md`—
+que los agentes paralelos **no** deben tocar, con `notas-rN.md` por worktree como reemplazo.
+
+**Decisions**
+
+1. El plan vive en dos sitios con papeles distintos: `ROADMAP.md` guarda el porqué y es
+   permanente; `session-handoff.md` guarda la secuencia y es efímero. Un plan solo en el handoff
+   desaparece en la siguiente reescritura.
+2. Se documenta explícitamente la alternativa en serie. Un plan que solo ofrece un camino empuja
+   a tomarlo aunque no convenga.
+
+**Issues**
+
+Ninguno.
+
+**Hallazgos fuera de alcance**
+
+- El abanico es además el **Experimento 2 del Proyecto 08** del curso. Hay que registrar tiempos
+  y conflictos para responder con datos si el paralelismo compensó su costo de coordinación.
+- Siguen pendientes los huecos del harness acumulados en R0, R1, R2 y la sesión de
+  infraestructura, en especial: la *Definition of Done* no tiene casilla para trabajo que no es
+  rebanada, la excepción de alcance no cubre comentarios del código, y no hay guardia automática
+  contra tocar `schema.ts` sin correr `db:generate`.
+
+**Next session**
+
+Paso 0 del handoff: preparación en serie. Después, el abanico.
