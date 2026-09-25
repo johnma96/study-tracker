@@ -56,10 +56,24 @@ export const programs = pgTable(
   (table) => [
     // RF-14 — el nombre es obligatorio y no supera 120 caracteres.
     check('programs_name_length', sql`char_length(${table.name}) between 1 and 120`),
-    // R7 — la base del repositorio, si existe, es http o https y no va vacía.
+    /**
+     * R7 — la base del repositorio, si existe, es http o https y no va vacía.
+     *
+     * **Sin cota numérica, y no es descuido.** La primera versión usaba
+     * `.{1,2040}` para replicar aquí el tope de longitud de `core`. Postgres
+     * **limita la repetición acotada a 255**: `{1,2040}` es una expresión
+     * inválida. Y lo peor es cómo falla — acepta el CHECK al crearlo, porque no
+     * evalúa la expresión hasta usarla, así que la migración se aplicó «con
+     * éxito», `db:check` pasó, y la restricción rechazaba **cualquier** URL con
+     * `invalid repetition count(s)` recién al insertar. Estuvo desplegada así.
+     *
+     * El tope de longitud vive en `core/services`, que es donde ya estaba. Esta
+     * restricción solo tiene un trabajo —la lista blanca de esquema— y hacerle
+     * repetir una regla que no le corresponde fue lo que la rompió.
+     */
     check(
       'programs_repo_url_scheme',
-      sql`${table.repoUrl} is null or ${table.repoUrl} ~* '^https?://.{1,2040}$'`,
+      sql`${table.repoUrl} is null or ${table.repoUrl} ~* '^https?://.+$'`,
     ),
     // RF-11
     check(

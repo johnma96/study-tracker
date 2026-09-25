@@ -958,3 +958,66 @@ usando `String.raw`, que elimina la ambigüedad de niveles.
 **Next session**
 
 El curso. El MVP está completo salvo la autenticación, que está diferida con condiciones escritas.
+
+---
+
+### Sesión 14 — 25/09/2026 — dos defectos encontrados usando la aplicación
+
+**Duración:** ~40 min
+**Objetivo:** corregir lo que apareció en el recorrido de prueba de R7.
+
+**What was done**
+
+**Defecto 1 — `repo_url` no se guardaba.** Al agregar el campo se actualizó el mapeo de
+**lectura** del repositorio (`toDomain`) pero no el de **inserción**: `create()` no incluía
+`repoUrl` en el `insert`. El campo se validaba bien, se leía bien, y se perdía en medio. Ninguna
+prueba unitaria podía verlo porque cada extremo hacía lo suyo correctamente. Se añadió
+`tests/integration/programs.integration.test.ts`, que recorre el viaje completo.
+
+**Defecto 2 — el CHECK de `repo_url` rechazaba toda URL.** La expresión era
+`^https?://.{1,2040}$`, replicando en el motor el tope de longitud que ya vive en `core`.
+**Postgres limita la repetición acotada a 255**, así que la expresión es inválida.
+
+> Lo grave es **cómo** falla: Postgres acepta el CHECK al crearlo, porque no evalúa la expresión
+> hasta usarla. La migración `0003` se aplicó «con éxito», `db:check` pasó, se desplegó a
+> producción, y la restricción rechazaba cualquier inserción con `invalid repetition count(s)`.
+> Una migración que se aplica sin error no garantiza que la restricción funcione.
+
+Corregido con la migración `0004_fix_repo_url_check`, que elimina la cota. El tope de longitud
+se queda donde ya estaba, en `core/services`. La restricción vuelve a tener un solo trabajo —la
+lista blanca de esquema— y hacerle repetir una regla ajena fue lo que la rompió.
+
+**Defecto 3 — pausar tras reanudar ejecutaba la acción equivocada.** Los botones «Pausar» y
+«Reanudar» ocupaban la misma posición, eran el mismo componente y no tenían `key`, así que React
+**reutilizaba la instancia** al alternar. `useActionState` conservaba su estado y la acción
+enlazada: el botón decía «Pausar» y ejecutaba *reanudar*, respondiendo «La sesión no estaba
+pausada». Recargar lo arreglaba, porque montaba una instancia nueva. Resuelto con `key`
+distintas y un comentario que explica por qué quitarlas reintroduce el defecto.
+
+**Decisions**
+
+1. **Las restricciones del motor no replican reglas de `core`.** El CHECK aplica la lista blanca
+   de esquema, que es defensa en profundidad real; el tope de longitud es criterio de interfaz y
+   se queda en un solo sitio. Duplicar la regla fue lo que introdujo el defecto.
+2. **Se arregla hacia adelante, con migración nueva.** `0003` ya estaba aplicada en `dev` y en
+   producción; editarla habría desincronizado los hashes del historial. `0004` la corrige y
+   viaja sola en el próximo despliegue — es la primera vez que la maquinaria de migraciones
+   repara algo en producción sin intervención manual.
+
+**Issues**
+
+Ninguno abierto. Los tres defectos eran de R7, es decir míos, y ninguno lo habrían encontrado
+las pruebas que existían: dos vivían **entre capas** y el tercero solo se manifiesta al alternar
+estado en el navegador.
+
+**Hallazgos fuera de alcance**
+
+- **No hay edición de programas**, así que `Harness Engineering` no puede recibir su `repo_url`
+  desde la interfaz: el campo solo existe al crear. Es la deuda más molesta en uso real.
+- **No hay prueba automatizada del defecto 3.** No existe entorno de pruebas de componentes React
+  en el proyecto; los defectos de reconciliación quedan fuera del alcance de la suite actual.
+- No hay borrado de sesiones ya detenidas.
+
+**Next session**
+
+El curso.

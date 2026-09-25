@@ -66,8 +66,20 @@ export function SessionBar({ snapshot }: { snapshot: SessionSnapshot }) {
           </div>
 
           <div className="flex flex-wrap items-start gap-2">
+            {/*
+              Las `key` distintas NO son decorativas y quitarlas reintroduce un
+              defecto real: sin ellas los dos botones ocupan la misma posición y
+              son el mismo componente, así que React **reutiliza la instancia**
+              al alternar. `useActionState` conserva entonces su estado interno
+              y la acción que tenía enlazada: el botón pasaba a decir «Pausar»
+              mientras seguía ejecutando *reanudar*, y respondía «La sesión no
+              estaba pausada». Recargar la página lo arreglaba, porque montaba
+              una instancia nueva. Con `key`, React desmonta y vuelve a montar:
+              la acción se reenlaza y el mensaje del paso anterior no se hereda.
+            */}
             {isPaused ? (
               <SessionActionButton
+                key="resume"
                 action={resumeSessionAction}
                 sessionId={session.id}
                 label="Reanudar"
@@ -76,6 +88,7 @@ export function SessionBar({ snapshot }: { snapshot: SessionSnapshot }) {
               />
             ) : (
               <SessionActionButton
+                key="pause"
                 action={pauseSessionAction}
                 sessionId={session.id}
                 label="Pausar"

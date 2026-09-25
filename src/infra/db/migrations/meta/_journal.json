@@ -29,6 +29,13 @@
       "when": 1790357379659,
       "tag": "0003_program_repo_url",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1790360015070,
+      "tag": "0004_fix_repo_url_check",
+      "breakpoints": true
     }
   ]
 }

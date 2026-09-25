@@ -79,6 +79,7 @@ export const drizzleProgramRepository: ProgramRepository = {
         status: input.status,
         startedAt: input.startedAt,
         targetAt: input.targetAt,
+        repoUrl: input.repoUrl,
       })
       .returning();
 
