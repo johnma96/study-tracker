@@ -81,10 +81,11 @@ afterAll(async () => {
 
 describe('one_running_session — la restricción vive en la base (RF-22)', () => {
   it('el índice único parcial existe con la definición esperada', async () => {
-    // Guardia de reproducibilidad: `npm run db:push` es lo que aplica el índice
-    // en un entorno nuevo. Si un cambio de versión de drizzle-kit dejara de
-    // emitirlo, un clon limpio quedaría sin la restricción y nadie se enteraría
-    // hasta que dos sesiones convivieran. Esta prueba lo convierte en un fallo.
+    // Guardia de reproducibilidad: `npm run db:migrate` es lo que aplica el
+    // índice en un entorno nuevo. Si se perdiera por el camino —una versión de
+    // drizzle-kit que deje de emitirlo, una migración generada sin revisar— un
+    // clon limpio quedaría sin la restricción y nadie se enteraría hasta que dos
+    // sesiones convivieran. Esta prueba lo convierte en un fallo.
     const result = await getDb().execute<{ indexdef: string }>(
       sql`select indexdef from pg_indexes where schemaname = 'public' and indexname = 'one_running_session'`,
     );

@@ -7,112 +7,130 @@
 
 ## Current Objective
 
-**Ninguno en marcha.** R2 — Cronómetro quedó cerrada en `passing` y no hay ninguna feature en
-`active`, que es el estado normal cuando nadie está trabajando.
+**Ninguno en marcha.** La sesión 9 fue **trabajo de infraestructura, no una rebanada**:
+`drizzle-kit push` quedó sustituido por migraciones versionadas. No hay ninguna feature en
+`active`, que es el estado normal cuando nadie está trabajando, y `feature_list.json` no
+cambió: este trabajo no tiene requerimiento EARS asociado porque no añade comportamiento.
 
-Con R2 cerrada se cumple el criterio de corte que fija `docs/ROADMAP.md`: la herramienta **ya
-es útil**. Cronometra una sesión, la guarda y sobrevive a cerrar el navegador. Todo lo que
-queda es visualización sobre datos que ya se están capturando.
-
-La siguiente rebanada la elige el paso 8 del *Startup Workflow*: R3, R4 y R5 dependen solo de
-R2 y son independientes entre sí, así que califican las tres y se puede empezar por cualquiera.
-R6 es compuerta, no etapa: se vuelve obligatoria en el momento en que la base guarde sesiones
-reales que importe perder o exponer — y R2 es justo la rebanada que empieza a generarlas.
+R2 — Cronómetro sigue en `passing`. La siguiente rebanada la elige el paso 8 del *Startup
+Workflow*: R3, R4 y R5 dependen solo de R2 y son independientes entre sí, así que califican las
+tres y se puede empezar por cualquiera. R6 es compuerta, no etapa.
 
 ## What was done
 
-**R2 cerrada en `passing`.** `RF-00`, `RF-20` a `RF-29`, `RF-2A` a `RF-2E` y `RF-2F` a `RF-2I`
-implementados y verificados en local. Las tres partes —índice único, pausas y recuperación—
-fueron juntas, no en tandas.
+**El esquema dejó de aplicarse a mano.** Antes, `npm run db:push` aplicaba la diferencia contra
+la base a la que apuntara `.env`, sin dejar rastro de qué se aplicó ni dónde. Eso ya había roto
+producción una vez —la tabla `sessions` quedó solo en `dev`— y el procedimiento manual de
+cambiar `.env`, aplicar y devolverlo falló dos veces seguidas, porque equivocarse de base no
+produce ningún error: simplemente trabajas contra la base equivocada, en silencio.
 
-- **El tiempo se deriva de `started_at`.** No hay ninguna columna de tiempo transcurrido ni
-  ningún contador en el navegador. `src/core/services/session-duration.ts` lo calcula todo
-  desde las marcas almacenadas, y el reloj de la interfaz llama a esa misma función en cada tic
-  con el valor que vino de la base. Comprobado sin navegador: con una sesión de hace 90 minutos
-  en la base, el HTML que devuelve `curl` ya trae `1:30:00`.
-- **`one_running_session` está en la base y lo aplica `npm run db:push`.** Se temía que
-  `drizzle-kit` no supiera expresar un índice único sobre la expresión constante `(true)`; se
-  comprobó y sí lo emite, y además lo lee de vuelta sin recrearlo (`No changes detected` en la
-  segunda corrida). Por eso se declara en `src/infra/db/schema.ts` y no en un paso de SQL
-  manual: un clon limpio que corra `db:push` queda con la restricción puesta. El detalle y la
-  consulta de comprobación están en `docs/DATA-MODEL.md`.
-- **La válvula de escape existe desde el primer día.** La barra de sesión vive en el layout, así
-  que el estado se ve y la sesión se puede detener o descartar desde cualquier vista
-  (`RF-2I`, `RF-2F`). Una sesión abierta hace más de ocho horas abre el diálogo de recuperación
-  con las tres opciones de `RF-2G`, y la duración indicada se guarda en `minutes_override`
-  (`RF-2H`).
-- **Dos niveles de prueba.** `npm run test`: 118 pruebas de `core/` sin base de datos, con los
-  seis casos de duración efectiva de `docs/DATA-MODEL.md` uno a uno, incluido el que más se
-  olvida —`minutesOverride` gana incluso sobre las pausas—. `npm run test:integration`: 8
-  pruebas contra el branch `dev` de Neon con las tres comprobaciones que solo tienen sentido
-  contra la base real.
-- **La regla completa de la *Definition of Done* se cumplió, comprobándola.** Al revertir la
-  consolidación de la pausa abierta en `decideStop` (`RF-2D`), falla la prueba que la cubre con
-  60 minutos en vez de 50; restaurado, vuelven las 118. Al borrar el índice
-  `one_running_session` de la base, fallan 6 de las 8 pruebas de integración; restaurado con
-  `npm run db:push`, vuelven las 8.
-- **Seis correcciones al harness y a la especificación**, todas sobre defectos comprobados.
-  Están detalladas en la entrada de la sesión 8 de `progress.md`. La de más consecuencia: la
-  *Clean restart path* de `AGENTS.md` prometía un estado ejecutable sin pasar por `db:push`, y
-  `db:push` es lo que crea el índice único.
+- **Migración base versionada** en `src/infra/db/migrations/0000_baseline.sql`, con su
+  `meta/_journal.json` y `meta/0000_snapshot.json`. Cubre las tres tablas, sus 34 restricciones
+  y sus seis índices, **incluido el parcial `one_running_session`**: `drizzle-kit` 0.31.11 sí lo
+  emite en `generate`, y se comprobó leyendo el `.sql`, no suponiéndolo.
+- **La migración base es idempotente a propósito.** `dev` y producción ya tenían el esquema
+  completo aplicado con `push`, es decir sin ninguna fila en la tabla de control de Drizzle: un
+  `CREATE TABLE` pelado habría fallado contra las dos. Escrita con `CREATE TABLE IF NOT EXISTS`,
+  `CREATE INDEX IF NOT EXISTS` y bloques `DO ... EXCEPTION WHEN duplicate_object` para las
+  claves foráneas, **cada base se auto-marca como migrada en su primera corrida sin tocar
+  nada**, y el mismo archivo sirve para una base vacía. La alternativa —insertar a mano el
+  registro de control— exigía SQL manual contra producción, que es justo lo que este cambio
+  elimina.
+- **Vercel aplica el esquema en el build.** El script `vercel-build` es
+  `drizzle-kit migrate && next build`. Si la migración falla, el build falla y Vercel conserva
+  el despliegue anterior. **`build` se queda en `next build` a secas** porque `./init.sh` lo
+  ejecuta: encadenar ahí las migraciones volvería la puerta de entrada dependiente de que Neon
+  responda, que es justo lo que `init.sh` evita.
+- **`db:push` ya no es el camino.** Se renombró a `db:push:emergency`. No se borró porque la
+  migración base idempotente no repara una base a medio aplicar, y esa herramienta hace falta;
+  el nombre impide usarla por inercia. Usarla se registra en `progress.md`.
+- **`init.sh` ejecuta `db:check`** —valida el historial de migraciones sin abrir conexión— y
+  **exige que existan** `db:generate`, `db:migrate` y `vercel-build`. Si `vercel-build`
+  desapareciera, el despliegue dejaría de aplicar el esquema sin que nada avisara.
+- **Documentación corregida donde contradecía la realidad**, por la excepción de alcance de
+  `AGENTS.md`: `AGENTS.md`, `README.md`, `docs/ARCHITECTURE.md` —sección nueva *El esquema
+  viaja con el despliegue* y el procedimiento de recuperación del branch `dev` caducado, que
+  seguía diciendo `db:push`—, `docs/DATA-MODEL.md`, y los comentarios de
+  `src/infra/db/schema.ts` y de la prueba de integración. Decisiones 18 a 21 registradas en la
+  tabla de `docs/ARCHITECTURE.md`.
+
+**Verificación, con la línea base tomada antes de tocar nada.** Conteos y esquema comparados
+antes y después: la única diferencia en toda la base es el esquema `drizzle` nuevo y **una**
+fila en `drizzle.__drizzle_migrations`. `programs` = 1, `session_types` = 4, `sessions` = 0 en
+los dos momentos, y el programa semilla conserva su `id` y su `created_at`. `db:migrate` se
+corrió cinco veces: no-op a partir de la primera. Sobre una base auxiliar **vacía**, las
+migraciones dejaron las mismas 34 restricciones que había dejado `push` en `dev`, comparadas
+una a una sin diferencias. `./init.sh` termina en `Init OK`; 118 pruebas de `core/` y 8 de
+integración pasan.
 
 ## What is broken or unverified
 
-- **Producción sin verificar.** La VPN corporativa bloquea `vercel.app` y la interceptación TLS
-  impide comprobarlo por línea de comandos. El criterio de hecho de R2 no exige la URL de
-  producción —eso era exclusivo de R0— y la confirmación humana no bloquea, así que no impidió
-  el cierre. **Queda pendiente que el usuario lo confirme desde un dispositivo fuera de la red
-  corporativa:** iniciar una sesión, cerrar el navegador, reabrir y ver el cronómetro corriendo
-  con el tiempo correcto.
-- **Las sesiones guardadas todavía no se pueden ver en una lista.** `RF-30` pertenece a R3. Es
-  coherente con el corte del plan, pero hasta entonces la única forma de ver una sesión cerrada
-  es consultar la base.
-- **Sin migraciones versionadas.** `drizzle-kit push` sirvió mientras la base solo tenía la fila
-  semilla. Con R2 ya hay datos que importa no perder, y `push` puede dejar `dev` y producción
-  divergentes sin que nada avise. Debería ser trabajo propio, no un agregado dentro de otra
-  rebanada.
-- **`APP_TIMEZONE` sigue sin leerla ningún código, y ahora es deliberado.** `RF-00` se
-  implementó como constante de dominio en `src/core/services/timezone.ts`, siguiendo el análisis
-  de `docs/ARCHITECTURE.md`: una zona que no cambia entre entornos no debe ser variable de
-  entorno, porque si falta o se escribe mal en producción la agrupación por día se rompe en
-  silencio. La variable queda documentada en `.env.example` por si algún día la zona se vuelve
-  preferencia del usuario, en cuyo caso pertenece a la base de datos.
-- **`RF-40` se acerca.** R2 es la rebanada que empieza a generar sesiones reales. La
-  autenticación es una compuerta, no una etapa: antes del primer despliegue con datos que
-  importen, R6.
-- **Ninguna feature quedó en `status: "active"`.** Es lo correcto: cero activas es el estado
-  normal cuando nadie está trabajando.
+- **El primer despliegue con `vercel-build` todavía no se ha hecho.** El commit está hecho pero
+  **no se ha empujado**. Qué esperar cuando se empuje, paso a paso, está en *Next Session*.
+- **Defecto nuevo que introduce este modelo:** cambiar `src/infra/db/schema.ts` sin correr
+  `npm run db:generate` deja el despliegue aplicando un esquema viejo, y en local todo compila y
+  pasa. `db:check` valida la coherencia del historial pero **no** detecta la omisión. La regla
+  está en `AGENTS.md`; una guardia automática sería trabajo propio.
+- **La migración base idempotente no repara una base a medio aplicar.** Los `CHECK` y `UNIQUE`
+  declarados dentro de `CREATE TABLE IF NOT EXISTS` se saltan si la tabla ya existe; las claves
+  foráneas y los índices sí se reparan. Para eso está `db:push:emergency`.
+- **Producción sin verificar desde esta máquina.** La VPN corporativa bloquea `vercel.app` y la
+  interceptación TLS impide llegar por línea de comandos. Queda pendiente de R2: abrir el
+  despliegue desde un dispositivo fuera de la red corporativa, iniciar una sesión, cerrar el
+  navegador y ver el cronómetro corriendo con el tiempo correcto.
+- **Las sesiones guardadas todavía no se pueden ver en una lista.** `RF-30` pertenece a R3.
+- **`RF-40` se acerca.** La autenticación es compuerta, no etapa: antes del primer despliegue
+  con datos que importen, R6.
+- **Ninguna feature quedó en `status: "active"`.**
 
 ## Files
 
-**Nuevos:** `src/core/model/session.ts`, `src/core/ports/session-repository.ts`,
-`src/core/services/timezone.ts`, `src/core/services/session-duration.ts`,
-`src/core/services/session-transitions.ts`, `src/core/services/session-input.ts` y sus cuatro
-archivos de prueba; `src/infra/db/unique-violation.ts`,
-`src/infra/repos/drizzle-session-repository.ts`; `src/app/session-actions.ts`,
-`src/app/current-session.ts`; `src/ui/session-view.ts`, `src/ui/session-form-state.ts`,
-`src/ui/session-clock.tsx`, `src/ui/session-bar.tsx`, `src/ui/session-action-button.tsx`,
-`src/ui/stop-session-form.tsx`, `src/ui/start-session-form.tsx`,
-`src/ui/manual-session-form.tsx`, `src/ui/session-recovery-dialog.tsx`;
-`vitest.integration.mts`, `tests/integration/session.integration.test.ts`.
+**Nuevos:** `src/infra/db/migrations/0000_baseline.sql`,
+`src/infra/db/migrations/meta/_journal.json`, `src/infra/db/migrations/meta/0000_snapshot.json`.
 
-**Modificados:** `src/infra/db/schema.ts` (tabla `sessions`, índices y CHECK),
-`src/infra/repos/drizzle-program-repository.ts` (usa el detector de unicidad compartido),
-`src/app/layout.tsx` (barra de sesión, `force-dynamic`), `src/app/page.tsx`, `package.json`
-(script `test:integration`), `init.sh`, `AGENTS.md`, `README.md`, `docs/ROADMAP.md`,
-`docs/ARCHITECTURE.md`, `docs/DATA-MODEL.md`, `feature_list.json`, `progress.md` y este archivo.
+**Modificados:** `package.json` (scripts `db:generate`, `db:migrate`, `db:check`,
+`db:push:emergency`, `vercel-build`), `init.sh`, `AGENTS.md`, `README.md`,
+`docs/ARCHITECTURE.md`, `docs/DATA-MODEL.md`, `src/infra/db/schema.ts` (comentario),
+`tests/integration/session.integration.test.ts` (comentario), `progress.md` y este archivo.
+
+`feature_list.json` **no se tocó**: esto no es una feature.
 
 ## Blockers
 
 **Ninguno.**
 
-**Aviso con fecha: el branch `dev` de Neon expira el 02/10/2026** (TTL de 7 días del panel).
-Si un comando de base falla con error de conexión después de esa fecha, no es el código:
-recrear el branch y correr `npm run db:push`, `npm run db:seed` y `npm run test:integration`.
-El procedimiento está en `docs/ARCHITECTURE.md`. El último comando no sobra: `db:push` es lo
-que crea el índice único, y sin él la aplicación parece sana y admite dos sesiones a la vez.
+**Acción de una sola vez que depende del usuario, y no es un comando de base de datos.** No hay
+nada que ejecutar contra producción: la primera corrida de `vercel-build` crea el esquema
+`drizzle`, aplica `0000_baseline` —que no toca nada, porque el esquema ya está— y deja la base
+marcada. Lo que sí hay que hacer una vez es **confirmar en el registro del primer build de
+Vercel** que aparece `migrations applied successfully`. Si no aparece, forzar el comando de
+build en *Settings → Build and Deployment → Build Command* con `npm run vercel-build`. El
+procedimiento completo, con la válvula de escape para aplicar migraciones a producción desde la
+máquina local sin guardar la cadena en `.env`, está en `docs/ARCHITECTURE.md`.
+
+**Aviso con fecha: el branch `dev` de Neon expira el 02/10/2026** (TTL de 7 días del panel). Si
+un comando de base falla con error de conexión después de esa fecha, no es el código: recrear
+el branch y correr `npm run db:migrate`, `npm run db:seed` y `npm run test:integration`. El
+procedimiento está en `docs/ARCHITECTURE.md`. El último comando no sobra: `db:migrate` es lo que
+crea el índice único, y sin él la aplicación parece sana y admite dos sesiones a la vez.
 
 ## Next Session
+
+**Antes de nada, el commit de infraestructura está hecho pero sin empujar.** Al empujarlo,
+Vercel hará esto, en este orden:
+
+1. Instala dependencias, **incluidas las de desarrollo**, así que `drizzle-kit` está
+   disponible.
+2. Ve el script `vercel-build` en `package.json` y lo ejecuta **en lugar de** `build`.
+3. `drizzle-kit migrate` se conecta con la `DATABASE_URL` del entorno de Vercel —el branch
+   principal— y aplica `0000_baseline`. Como la base ya tiene el esquema, **no cambia nada**:
+   crea el esquema `drizzle`, inserta una fila de control y termina con
+   `migrations applied successfully`.
+4. Si ese paso fallara, el build se detiene ahí, `next build` **no llega a ejecutarse** y
+   Vercel conserva el despliegue anterior. Está comprobado en local con una cadena inválida.
+5. `next build` construye y el despliegue sale a producción como siempre.
+
+De ahí en adelante, cada despliegue aplica las migraciones pendientes antes de construir.
 
 Recommended Next Step: **R3 — Totales y mapa de calor**, por dos razones: es la que hace
 visibles las sesiones que R2 ya guarda (`RF-30`), y es donde entra `shadcn/ui` y Recharts, que
@@ -121,17 +139,22 @@ el resto de rebanadas van a reutilizar. R4 y R5 califican igual si se prefiere o
 1. `cd study-tracker` y confirmar con `pwd`. No trabajar desde el repositorio del curso: la
    terminal tiende a reposicionarse ahí sola.
 2. `./init.sh` — debe terminar en "Init OK" y ejecutar las 118 pruebas.
-3. `npm run test:integration` — 8 pruebas contra `dev`. Si falla por conexión, el branch
+3. `npm run db:migrate` — no debería haber nada pendiente. Si falla por conexión, el branch
    caducó: ver *Blockers*.
-4. Poner la feature elegida en `active` antes de escribir código, y dejarla en `passing` o
+4. `npm run test:integration` — 8 pruebas contra `dev`.
+5. Poner la feature elegida en `active` antes de escribir código, y dejarla en `passing` o
    `blocked` al cerrar.
-5. Para R3, la trampa conocida ya tiene herramienta: `toCivilDateInAppZone` de
+6. **Si la rebanada toca `src/infra/db/schema.ts`** —R4 y R5 lo harán, con `artifacts`,
+   `metrics` y `readings`— correr `npm run db:generate`, **leer el `.sql` que salga** y subirlo
+   en el mismo commit. Leerlo no es ceremonia: es donde se comprueba que no se perdió ninguna
+   restricción por el camino.
+7. Para R3, la trampa conocida ya tiene herramienta: `toCivilDateInAppZone` de
    `src/core/services/timezone.ts` convierte a `America/Bogota` y está probada con el caso de
    las 23:40. Agrupar por `started_at::date` sin convertir es el error silencioso más probable
    del modelo.
-6. Corregir el campo `verification` de la rebanada que se abra: los de R3 a R6 todavía mezclan
+8. Corregir el campo `verification` de la rebanada que se abra: los de R3 a R6 todavía mezclan
    verificación ejecutable y confirmación humana en una sola frase.
-7. Cerrar según el procedimiento "End of Session" de `AGENTS.md`.
+9. Cerrar según el procedimiento "End of Session" de `AGENTS.md`.
 
 Recordatorio de alcance: `metrics` y `readings` son de **R5**; la autenticación, de **R6**, que
 es compuerta y no etapa final.

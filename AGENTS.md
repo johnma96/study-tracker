@@ -41,9 +41,28 @@ npm run test:watch        # vitest en modo observador
 npm run test:integration  # vitest contra el branch dev de Neon. Requiere DATABASE_URL.
 npm run build             # next build
 npm run dev               # servidor local
-npm run db:push           # aplica el esquema a la base de datos, con sus índices
+npm run db:generate       # genera la migración después de tocar src/infra/db/schema.ts
+npm run db:migrate        # aplica las migraciones pendientes. Idempotente. Requiere DATABASE_URL
+npm run db:check          # valida el historial de migraciones. No abre conexión: init.sh lo corre
 npm run db:seed           # siembra los datos iniciales (idempotente)
 ```
+
+**El esquema viaja con el despliegue, no se aplica a mano.** El camino normal es
+`db:generate` —que escribe un archivo `.sql` versionado en `src/infra/db/migrations/`— y
+`db:migrate`, que lo aplica. En Vercel lo aplica el script `vercel-build`
+(`drizzle-kit migrate && next build`): si la migración falla, el build falla y Vercel conserva
+el despliegue anterior.
+
+**`npm run db:push:emergency` sigue existiendo, pero ya no es el camino.** `push` compara el
+esquema TypeScript contra la base y aplica la diferencia sin dejar rastro de qué se aplicó ni
+dónde, así que `dev` y producción pueden divergir sin que nada avise. Ya ocurrió: la tabla
+`sessions` quedó solo en `dev` y el despliegue se rompió. Úsalo únicamente para reparar a
+mano una base que quedó a medias, y regístralo en `progress.md` cuando lo hagas.
+
+> **Si tocas `src/infra/db/schema.ts`, `npm run db:generate` y el `.sql` que salga van en el
+> mismo commit.** Un esquema cambiado sin migración generada es el defecto nuevo que introduce
+> este modelo: en local todo compila y pasa, y el despliegue aplica un esquema viejo.
+> `db:check` valida que el historial sea coherente, pero **no** detecta esa omisión.
 
 `check` **debe** incluir `next typegen` antes de `tsc`. Sobre un clon limpio, `tsc --noEmit`
 a secas falla: la plantilla de Next 16 usa tipos globales como `LayoutProps<"/">` que Next
@@ -172,17 +191,23 @@ Cualquier sesión nueva debe poder llegar a un estado ejecutable con estos pasos
 git clone <repo> && cd study-tracker
 cp .env.example .env    # completa DATABASE_URL
 ./init.sh               # instala y verifica
-npm run db:push         # crea tablas e índices en esa base
+npm run db:migrate      # crea tablas e índices en esa base
 npm run db:seed         # siembra el programa inicial (idempotente)
 npm run dev             # servidor en marcha
 ```
 
 Los dos pasos de base **no son opcionales y antes faltaban aquí**: `init.sh` no toca la base,
 así que sobre una base vacía —un branch de Neon recién creado— el servidor arrancaba sin tablas
-y la aplicación no servía para nada. `db:push` es además lo que crea el índice único
+y la aplicación no servía para nada. `db:migrate` es además lo que crea el índice único
 `one_running_session`, del que depende el invariante "como máximo una sesión en curso": sin
 ese paso, un clon limpio queda sin la restricción y nada lo avisa hasta que conviven dos
 sesiones. Si la base ya tenía el esquema, los dos comandos no hacen nada y lo dicen.
+
+**`db:migrate` sustituyó a `db:push` en esta ruta el 25/09/2026.** La migración base está
+escrita de forma idempotente, así que el mismo archivo sirve para una base vacía y para una
+que ya tiene el esquema. Comprobado contra una base recién creada: deja las tres tablas, las
+34 restricciones y los seis índices, incluido `one_running_session` con la definición exacta
+que verifica `npm run test:integration`.
 
 Si esta secuencia no funciona desde un clon limpio, arreglarla es más prioritario que
 cualquier feature. El estado del repositorio, no la memoria de nadie, es lo que permite

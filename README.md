@@ -32,9 +32,21 @@ Vitest · Vercel. shadcn/ui y Recharts entran con R3.
 ```bash
 cp .env.example .env     # completa DATABASE_URL con tu base de Neon
 ./init.sh                # instala, verifica tipos, lint, pruebas y build
-npm run db:push          # aplica el esquema a la base, con sus índices
+npm run db:migrate       # aplica las migraciones a la base, con sus índices
 npm run db:seed          # siembra el programa inicial (idempotente)
 npm run dev              # http://localhost:3000
+```
+
+El esquema **viaja con el despliegue**: vive como migraciones versionadas en
+`src/infra/db/migrations/` y Vercel las aplica en cada build a través del script
+`vercel-build`. Nadie tiene que acordarse de aplicarlo a mano, y si la migración falla el
+build falla y el despliegue anterior se queda en pie.
+
+Si cambias `src/infra/db/schema.ts`, genera la migración y súbela en el mismo commit:
+
+```bash
+npm run db:generate      # escribe el .sql en src/infra/db/migrations/
+npm run db:migrate       # lo aplica a tu base de desarrollo
 ```
 
 Las pruebas que tocan la base van aparte, porque necesitan `DATABASE_URL`:

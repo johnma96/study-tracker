@@ -12,7 +12,7 @@ re-litigarlas. Si una resulta equivocada durante el desarrollo, se registra el h
 | Lenguaje | **TypeScript**, modo estricto | |
 | UI | **React 19** + **Tailwind** + **shadcn/ui** | Componentes accesibles sin trabajo de diseño. |
 | Gráficas | **Recharts** | El mapa de calor de calendario se hace con SVG propio; no requiere librería. |
-| ORM | **Drizzle** | Esquema en TypeScript, sin binarios nativos, compatible con entornos edge. Migraciones con `drizzle-kit`. |
+| ORM | **Drizzle** | Esquema en TypeScript, sin binarios nativos, compatible con entornos edge. Migraciones **versionadas** con `drizzle-kit generate` / `migrate`; `push` quedó retirado. |
 | Base de datos | **Postgres (Neon)** | Es la integración nativa de Vercel desde que Vercel Postgres se migró a Neon (dic 2024). Tiene *branching* para separar entornos. |
 | Pruebas | **Vitest** | |
 | Autenticación | **Auth.js**, diferido a la rebanada 6 | Ver `RF-40`. |
@@ -62,22 +62,132 @@ Recuperación, unos cinco minutos:
 ```bash
 # 1. En el panel de Neon, crear de nuevo un branch dev desde el principal
 # 2. Copiar su cadena pooled a DATABASE_URL en .env
-npm run db:push          # aplica el esquema, con sus índices
+npm run db:migrate       # aplica las migraciones pendientes, con sus índices
 npm run db:seed          # siembra, es idempotente
 npm run test:integration # comprueba que la base quedó utilizable
 ```
 
-Un branch de Neon es un clon *copy-on-write* del padre, así que nace con el esquema y los datos
-del principal ya adentro: `db:push` suele reportar "No changes detected" y la semilla "ya
-presente". Es lo esperado, no una señal de que algo falló.
+Un branch de Neon es un clon *copy-on-write* del padre, así que nace con el esquema, los datos
+**y el historial de migraciones** del principal ya adentro: `db:migrate` no encuentra nada
+pendiente y la semilla reporta "ya presente". Es lo esperado, no una señal de que algo falló.
 
-`db:push` es también lo que crea el índice único parcial `one_running_session`, del que depende
-el invariante "como máximo una sesión en curso". Por eso la comprobación final no sobra: si el
-índice faltara, la aplicación seguiría pareciendo sana y admitiría dos sesiones a la vez. El
-detalle está en la sección correspondiente de `docs/DATA-MODEL.md`.
+`db:migrate` es también lo que crea el índice único parcial `one_running_session`, del que
+depende el invariante "como máximo una sesión en curso". Por eso la comprobación final no
+sobra: si el índice faltara, la aplicación seguiría pareciendo sana y admitiría dos sesiones a
+la vez. El detalle está en la sección correspondiente de `docs/DATA-MODEL.md`.
 
 Si el trabajo se extiende más allá del 02/10, conviene revisar en el panel si el TTL se puede
 extender o quitar, antes de que expire a mitad de una sesión.
+
+## El esquema viaja con el despliegue
+
+Decisión del 25/09/2026: **el esquema se aplica con migraciones versionadas, no con
+`drizzle-kit push`.** Los archivos `.sql` viven en `src/infra/db/migrations/` y se versionan
+junto al código, de modo que el commit que cambia el esquema es el mismo que lo aplica.
+
+### Por qué se retiró `push`
+
+`push` compara el esquema TypeScript contra la base a la que apunte `DATABASE_URL` y aplica la
+diferencia. No deja rastro de qué se aplicó ni dónde, así que dos entornos pueden divergir sin
+que nada avise.
+
+> Ocurrió en R2: `push` creó la tabla `sessions` solo en el branch `dev`. El despliegue quedó
+> sin ella y **la aplicación en producción se rompió** hasta que alguien recordó aplicarla a
+> mano. El procedimiento manual —cambiar `.env`, aplicar, devolverlo— falló además dos veces
+> seguidas, porque equivocarse de base **no produce ningún error**: simplemente trabajas contra
+> la base equivocada, en silencio.
+
+`push` sigue instalado como `npm run db:push:emergency`, con ese nombre a propósito: sirve para
+reparar a mano una base que quedó a medias, no para el trabajo diario. Usarlo se registra en
+`progress.md`.
+
+### La migración base es idempotente, y eso fue una decisión
+
+`src/infra/db/migrations/0000_baseline.sql` usa `CREATE TABLE IF NOT EXISTS`,
+`CREATE INDEX IF NOT EXISTS` y, para las claves foráneas —que en PostgreSQL no admiten
+`IF NOT EXISTS`—, un bloque `DO $$ … EXCEPTION WHEN duplicate_object THEN NULL; END $$`.
+
+El historial se introdujo cuando `dev` y producción **ya tenían el esquema completo** aplicado
+con `push`, es decir sin ninguna fila en la tabla de control de Drizzle. Un `CREATE TABLE`
+pelado habría fallado contra las dos. Las dos salidas posibles eran:
+
+| Camino | Qué exige | Por qué se descartó / se eligió |
+|---|---|---|
+| Insertar a mano el registro "ya aplicada" en `drizzle.__drizzle_migrations` | Ejecutar SQL manual contra **producción**, con el hash correcto del archivo | **Descartado.** Es exactamente el procedimiento manual contra la base equivocada que este cambio existe para eliminar, y un hash mal copiado vuelve a ejecutar la migración |
+| Escribir la migración base de forma idempotente | Nada | **Elegido.** Cada base se auto-marca como migrada en su primera corrida sin tocar nada. Mismo archivo para una base vacía y para una que ya tiene el esquema |
+
+Límite conocido y deliberado: sobre una base **a medio aplicar**, los `CHECK` y `UNIQUE`
+declarados dentro de `CREATE TABLE IF NOT EXISTS` se saltan en silencio porque la tabla ya
+existe. Las claves foráneas y los índices sí se reparan, porque van en sentencias propias con
+guarda. Reparar una base a medias no es trabajo de una migración base: para eso está
+`db:push:emergency`.
+
+De aquí en adelante las migraciones **no se escriben a mano**: las genera `npm run db:generate`
+a partir de `src/infra/db/schema.ts` y del snapshot de `meta/`, y se aplican tal cual salen.
+
+### Cómo se aplica en Vercel
+
+`package.json` separa dos scripts a propósito:
+
+| Script | Quién lo corre | Qué hace |
+|---|---|---|
+| `build` | el desarrollador y `./init.sh` | `next build`. **No toca la base.** |
+| `vercel-build` | Vercel | `drizzle-kit migrate && next build` |
+
+Vercel ejecuta `vercel-build` en lugar de `build` cuando existe. Encadenar la migración al
+build aprovecha que Vercel ya tiene `DATABASE_URL` en su entorno, y hace que **una migración
+fallida rompa el build**: Vercel conserva entonces el despliegue anterior en vez de publicar
+código contra un esquema que no existe. Eso es lo deseable.
+
+**No se encadenó a `build`** porque `./init.sh` lo ejecuta, y entonces la puerta de entrada
+del repositorio correría migraciones contra `dev` en cada corrida —y dependería de que Neon
+responda, que es justo lo que `init.sh` evita: un branch caducado se leería como código roto.
+El desarrollador aplica migraciones cuando quiere, con `npm run db:migrate`.
+
+`drizzle-kit` es `devDependency`, y Vercel instala también las de desarrollo durante el build,
+así que está disponible. `vercel-build` **no** usa `node --env-file=.env`: `.env` no existe en
+Vercel y `--env-file` falla si el archivo falta.
+
+### Lo único que el usuario hace una vez, en producción
+
+**No hay ningún comando de base que correr contra producción.** La primera corrida de
+`vercel-build` crea el esquema `drizzle`, aplica `0000_baseline` —que no toca nada, porque el
+esquema ya está— y deja la base marcada como migrada.
+
+Lo que sí hay que hacer una vez es **confirmar que Vercel está ejecutando `vercel-build`**. En
+el primer despliegue después de este cambio, abrir *Deployments → el despliegue → Building* y
+comprobar que el registro incluye la línea:
+
+```
+[✓] migrations applied successfully!
+```
+
+Si no aparece, forzar el comando de build en *Settings → Build and Deployment → Build Command*,
+activando el override con exactamente:
+
+```
+npm run vercel-build
+```
+
+Válvula de escape, solo si alguna vez hay que aplicar migraciones a producción desde la máquina
+local. Pasa la cadena **en la propia línea**, nunca al `.env` (bash / Git Bash):
+
+```bash
+DATABASE_URL='<cadena-de-produccion>' node ./node_modules/drizzle-kit/bin.cjs migrate
+```
+
+En PowerShell, borrándola después para que no quede en la sesión:
+
+```powershell
+$env:DATABASE_URL='<cadena-de-produccion>'; node ./node_modules/drizzle-kit/bin.cjs migrate; Remove-Item Env:DATABASE_URL
+```
+
+### La regla que hay que recordar
+
+Tocar `src/infra/db/schema.ts` obliga a `npm run db:generate` y a subir el `.sql` en el mismo
+commit. Ese es el defecto nuevo que introduce este modelo —en local todo compila y pasa, y el
+despliegue aplica un esquema viejo— y `npm run db:check`, que `init.sh` ejecuta, valida que el
+historial sea coherente pero **no** detecta la omisión.
 
 ## Capas
 
@@ -185,3 +295,7 @@ APP_TIMEZONE=America/Bogota
 | 15 | El índice `one_running_session` se declara en el esquema de Drizzle, no en SQL suelto | 25/09/2026 | Se comprobó que `drizzle-kit` 0.31.11 sí emite el índice único sobre la expresión constante `(true)` y lo lee de vuelta sin recrearlo. Un paso manual habría dejado la restricción fuera de la ruta de reinicio limpio |
 | 16 | El reloj de referencia es `now()` del motor, no el del proceso de Node | 25/09/2026 | `started_at` lo pone la base; medir el cierre con otro reloj mezcla dos relojes que nadie sincroniza, y un desfase de segundos basta para violar `ended_after_started` o para restar tiempo trabajado |
 | 17 | `zod` no valida longitudes de `note` contra un CHECK del motor | 25/09/2026 | La aplicación puede ser más estricta que la base sin riesgo; lo peligroso es lo contrario, que acepte lo que el motor rechaza. Añadir CHECK por cada cota inventada haría migrar el esquema por un cambio de criterio de interfaz |
+| 18 | Migraciones versionadas en vez de `drizzle-kit push` | 25/09/2026 | `push` aplica la diferencia contra la base a la que apunte `.env` sin dejar rastro: `sessions` quedó solo en `dev` y producción se rompió. Con migraciones el esquema viaja con el commit y con el despliegue |
+| 19 | La migración base se escribe idempotente, no se marca a mano como aplicada | 25/09/2026 | Las dos bases ya tenían el esquema y ninguna historial. Insertar el registro de control a mano exigía SQL manual contra producción, que es el procedimiento que este cambio elimina. Idempotente, cada base se auto-marca en su primera corrida y el mismo archivo sirve para una base vacía |
+| 20 | `vercel-build` separado de `build`, no `migrate` encadenado a `build` | 25/09/2026 | `./init.sh` ejecuta `build`; encadenar ahí las migraciones volvería la puerta de entrada dependiente de Neon y aplicaría esquema en cada corrida. Vercel prefiere `vercel-build` cuando existe, así que el despliegue migra y el desarrollador no |
+| 21 | `db:push` se conserva renombrado a `db:push:emergency` | 25/09/2026 | Borrarlo dejaría sin herramienta la reparación de una base a medio aplicar, que la migración base idempotente no cubre. El nombre hace imposible usarlo por inercia |

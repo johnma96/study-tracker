@@ -8,8 +8,11 @@
 que era el criterio de corte de `docs/ROADMAP.md`: a partir de aquí todo es visualización sobre
 datos que ya se capturan. Desplegado en <https://study-tracker-eight-sigma.vercel.app/>.
 **Bloqueos:** ninguno. Branch `dev` de Neon en uso; **expira el 02/10/2026**.
+**Esquema:** migraciones versionadas desde el 25/09/2026 (sesión 9). `drizzle-kit push` quedó
+retirado a `db:push:emergency`; Vercel aplica el esquema en el build vía `vercel-build`.
 **Siguiente paso:** R3, R4 o R5, en cualquier orden — son independientes entre sí. Antes,
-confirmar el despliegue de R2 desde un dispositivo fuera de la red corporativa.
+confirmar el despliegue de R2 desde un dispositivo fuera de la red corporativa, y comprobar en
+el registro del primer build de Vercel que aparece `migrations applied successfully`.
 
 ---
 
@@ -546,3 +549,107 @@ Todas sobre defectos comprobados, no sobre preferencias de redacción.
 
 R3, R4 o R5, en cualquier orden. Antes, confirmar el despliegue de R2 desde un dispositivo
 fuera de la red corporativa.
+
+---
+
+### Sesión 9 — 25/09/2026 — migraciones versionadas (infraestructura, no una rebanada)
+
+**Duración:** ~60 min
+**Objetivo:** sustituir `drizzle-kit push` por migraciones versionadas, de modo que el esquema
+viaje con el despliegue y nadie tenga que acordarse de aplicarlo a mano.
+
+**No es una feature de `feature_list.json`.** No hay comportamiento nuevo ni requerimiento EARS
+asociado: es la cadena de despliegue. Estaba anotado como hallazgo fuera de alcance en las
+sesiones 7 y 8, y se atendió como trabajo propio en vez de colarlo dentro de otra rebanada.
+
+**What was done**
+
+- **Migración base generada y versionada:** `src/infra/db/migrations/0000_baseline.sql` más
+  `meta/_journal.json` y `meta/0000_snapshot.json`. Cubre `programs`, `session_types` y
+  `sessions` con sus 34 restricciones y sus seis índices, **incluido el parcial
+  `one_running_session`**, que `drizzle-kit` 0.31.11 sí emite en `generate` — se verificó
+  leyendo el `.sql`, no suponiéndolo.
+- **La migración base se escribió idempotente a mano:** `CREATE TABLE IF NOT EXISTS`,
+  `CREATE INDEX IF NOT EXISTS`, y bloques `DO ... EXCEPTION WHEN duplicate_object` para las
+  claves foráneas, que en PostgreSQL no admiten `IF NOT EXISTS`. El `meta/` generado **no se
+  tocó**: es lo que compara `db:generate` para la siguiente migración.
+- **Scripts de `package.json`:** `db:push` pasó a `db:push:emergency`. Nuevos `db:generate`,
+  `db:migrate`, `db:check` y `vercel-build` (`drizzle-kit migrate && next build`). `build` se
+  queda en `next build` a secas.
+- **`init.sh`:** ejecuta `db:check` —valida el historial, no abre conexión— y exige que existan
+  `db:generate`, `db:migrate` y `vercel-build`. Si `vercel-build` desapareciera, el despliegue
+  dejaría de aplicar el esquema sin que nada avisara: el mismo defecto del `--if-present`.
+- **Documentación corregida** donde contradecía la realidad, por la excepción de alcance de
+  `AGENTS.md`: `AGENTS.md` (comandos de verificación y *Clean restart path*), `README.md`,
+  `docs/ARCHITECTURE.md` (sección nueva *El esquema viaja con el despliegue*, y el procedimiento
+  de recuperación del branch `dev` caducado, que decía `db:push`), `docs/DATA-MODEL.md`, y los
+  comentarios de `src/infra/db/schema.ts` y de la prueba de integración.
+
+**Decisions**
+
+Registradas como 18 a 21 en `docs/ARCHITECTURE.md`.
+
+1. **Migraciones versionadas en vez de `push`.** `push` aplica la diferencia contra la base a
+   la que apunte `.env` sin dejar rastro de qué se aplicó ni dónde.
+2. **La migración base es idempotente; no se marca a mano como aplicada.** La alternativa
+   —insertar el registro de control en `drizzle.__drizzle_migrations`— exigía ejecutar SQL
+   manual contra producción con el hash correcto del archivo, que es exactamente el
+   procedimiento manual que este cambio existe para eliminar. Además, un hash mal copiado
+   vuelve a ejecutar la migración. Escrita idempotente, cada base se auto-marca en su primera
+   corrida y el mismo archivo sirve para una base vacía.
+3. **`vercel-build` separado de `build`.** `./init.sh` ejecuta `build`; encadenar ahí las
+   migraciones volvería la puerta de entrada dependiente de que Neon responda —justo lo que
+   `init.sh` evita— y aplicaría esquema en cada corrida local. Vercel prefiere `vercel-build`
+   cuando existe, así que migra el despliegue y no el desarrollador.
+4. **`push` se conserva renombrado, no se borra.** La migración base idempotente no repara una
+   base a medio aplicar; esa herramienta hace falta, y el nombre impide usarla por inercia.
+
+**Verificación**
+
+- **Línea base tomada antes de tocar nada** —esquema completo, restricciones, índices, conteos
+  y la fila semilla con su UUID— y comparada después: la única diferencia en toda la base es el
+  esquema `drizzle` nuevo y **una** fila en `drizzle.__drizzle_migrations`. `programs` = 1,
+  `session_types` = 4, `sessions` = 0 antes y después; el programa semilla conserva su `id`
+  `ef26e04b-8a0e-47d6-84c0-66ecfa9c1cd0` y su `created_at`.
+- `npm run db:migrate` contra `dev` corrido **cinco veces**: la primera se auto-marca sin tocar
+  nada, las siguientes son no-op. La tabla de control se queda en una sola fila.
+- **Base vacía, prueba real:** se creó una base auxiliar en el mismo branch, se le aplicaron
+  solo las migraciones y quedó con las tres tablas, **las mismas 34 restricciones** que había
+  dejado `push` en `dev` —comparadas una a una, sin diferencias— y los seis índices, con
+  `one_running_session` en la forma exacta que verifica la prueba de integración:
+  `CREATE UNIQUE INDEX ... USING btree ((true)) WHERE (ended_at IS NULL)`. La base auxiliar se
+  borró.
+- **`vercel-build` simulado como lo corre Vercel:** con `.env` movido fuera y `DATABASE_URL`
+  solo en el entorno, aplica migraciones y construye. Con una cadena inválida sale con código
+  1 y **`next build` no llega a ejecutarse**, que es lo que hace que Vercel conserve el
+  despliegue anterior.
+- `./init.sh` termina en `Init OK`. `npm run test`: 118 pruebas. `npm run test:integration`: 8
+  pruebas. `npm run build` y `npm run check` sin errores.
+
+**Issues**
+
+- `drizzle-kit generate` emite `CREATE TABLE` pelado: la idempotencia **no** la da la
+  herramienta, se escribió a mano. Solo aplica a la migración base; las siguientes se generan y
+  se aplican tal cual salen, sobre una base que ya tiene historial.
+- Los archivos temporales de verificación (`.snapshot.tmp.mjs`, `.smoke.tmp.mjs`) se
+  eliminaron. La cadena de conexión nunca se imprimió.
+
+**Hallazgos fuera de alcance**
+
+- **Defecto nuevo que introduce este modelo:** cambiar `src/infra/db/schema.ts` sin correr
+  `db:generate` deja el despliegue aplicando un esquema viejo, y en local todo compila y pasa.
+  `db:check` valida la coherencia del historial pero **no** detecta la omisión. Documentado en
+  `AGENTS.md` y en `docs/ARCHITECTURE.md`; una guardia automática —comparar el esquema con el
+  snapshot dentro de `init.sh`— sería trabajo propio.
+- La migración base idempotente **no repara** una base a medio aplicar: los `CHECK` y `UNIQUE`
+  declarados dentro de `CREATE TABLE IF NOT EXISTS` se saltan si la tabla ya existe. Las claves
+  foráneas y los índices sí se reparan. Documentado.
+- Siguen abiertos de sesiones anteriores: los campos `verification` de R3 a R6 mezclan
+  verificación ejecutable y confirmación humana; `plannedSessions` no se captura por la
+  interfaz (`RF-36`); no existe edición ni borrado de programas; `RF-30` espera a R3.
+
+**Next session**
+
+R3, R4 o R5, en cualquier orden. Antes, confirmar el despliegue de R2 desde un dispositivo
+fuera de la red corporativa y comprobar en el registro del primer build de Vercel que aparece
+`migrations applied successfully`.

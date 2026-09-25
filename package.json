@@ -5,13 +5,17 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "vercel-build": "drizzle-kit migrate && next build",
     "start": "next start",
     "lint": "eslint",
     "check": "next typegen && tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:integration": "node --env-file=.env ./node_modules/vitest/vitest.mjs run --config vitest.integration.mts",
-    "db:push": "node --env-file=.env ./node_modules/drizzle-kit/bin.cjs push",
+    "db:generate": "node ./node_modules/drizzle-kit/bin.cjs generate",
+    "db:migrate": "node --env-file=.env ./node_modules/drizzle-kit/bin.cjs migrate",
+    "db:check": "node ./node_modules/drizzle-kit/bin.cjs check",
+    "db:push:emergency": "node --env-file=.env ./node_modules/drizzle-kit/bin.cjs push",
     "db:seed": "node --env-file=.env scripts/seed.mjs"
   },
   "dependencies": {

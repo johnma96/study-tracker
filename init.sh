@@ -74,24 +74,37 @@ require_script() {
 }
 
 # Solo se comprueba que exista: no se ejecuta aqui.
-# `test:integration` necesita red y DATABASE_URL, y esta puerta de entrada no
-# puede depender de que Neon responda: un branch caducado se leeria como codigo
-# roto. Pero si el script desapareciera del package.json, la evidencia de R2
-# dejaria de ser reproducible sin que nada avisara, que es el mismo defecto del
-# `--if-present` con otra cara.
+# `test:integration`, `db:migrate` y `db:seed` necesitan red y DATABASE_URL, y esta
+# puerta de entrada no puede depender de que Neon responda: un branch caducado se
+# leeria como codigo roto. `vercel-build` tampoco se ejecuta aqui, porque aplicaria
+# migraciones en cada corrida de init.sh.
+# Pero si cualquiera de esos scripts desapareciera del package.json, la evidencia
+# dejaria de ser reproducible --o, peor, el despliegue dejaria de aplicar el
+# esquema-- sin que nada avisara, que es el mismo defecto del `--if-present` con
+# otra cara.
 declare_script() {
   local nombre="$1"
+  local nota="${2:-se ejecuta a mano: requiere base de datos}"
   script_existe "$nombre"
-  echo "    $nombre declarado (se ejecuta a mano: requiere base de datos)"
+  echo "    $nombre declarado ($nota)"
 }
 
 require_script check
 require_script lint
 require_script test
+# `db:check` valida el historial de migraciones (journal y snapshots coherentes,
+# sin colisiones de indice). No abre conexion ni necesita DATABASE_URL, asi que si
+# cabe dentro de la puerta de entrada.
+require_script db:check
 declare_script test:integration
+declare_script db:generate "genera la migracion despues de tocar src/infra/db/schema.ts"
+declare_script db:migrate
+declare_script vercel-build "lo ejecuta Vercel: aplica migraciones y luego construye"
 require_script build
 
 echo ""
 echo "Init OK."
+echo "Esquema de la base:     npm run db:migrate   (idempotente; no toca datos)"
+echo "Datos semilla:          npm run db:seed      (idempotente)"
 echo "Pruebas contra la base: npm run test:integration"
 echo "Levanta el servidor con: npm run dev"

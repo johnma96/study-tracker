@@ -2,9 +2,10 @@
 
 Especificación del modelo. El agente que implemente genera `src/infra/db/schema.ts` a partir
 de aquí. **El SQL literal de este documento no se ejecuta nunca**: lo que corre contra el motor
-es el esquema de Drizzle, que `npm run db:push` traduce. Este DDL es el contrato que ese
-esquema debe cumplir. Al implementar una tabla nueva, aplícala y corrige aquí lo que el motor
-rechace.
+es el esquema de Drizzle, del que `npm run db:generate` deriva las migraciones versionadas de
+`src/infra/db/migrations/`. Este DDL es el contrato que ese esquema debe cumplir. Al implementar
+una tabla nueva, genera la migración, aplícala con `npm run db:migrate` y corrige aquí lo que el
+motor rechace.
 
 Estado al 25/09/2026: `programs`, `session_types` y `sessions` están aplicadas y verificadas
 contra Neon (PostgreSQL 18.6). `artifacts` (R4), `metrics` y `readings` (R5) siguen siendo solo
@@ -168,7 +169,7 @@ CREATE TABLE readings (
 
 ### Cómo se aplica `one_running_session` y cómo se reproduce
 
-**Con `npm run db:push`, sin ningún paso manual.** Se temía que `drizzle-kit` no supiera
+**Con `npm run db:migrate`, sin ningún paso manual.** Se temía que `drizzle-kit` no supiera
 expresar un índice único sobre una expresión constante y hubiera que aplicarlo con SQL suelto.
 Se comprobó el 25/09/2026 con `drizzle-kit` 0.31.11 sobre PostgreSQL 18.6 y sí sabe: de
 la declaración de `src/infra/db/schema.ts` emite
@@ -178,19 +179,28 @@ CREATE UNIQUE INDEX "one_running_session" ON "sessions" USING btree ((true))
   WHERE "sessions"."ended_at" is null;
 ```
 
-y una segunda corrida de `push` responde *"No changes detected"*, es decir que también lo lee
-de vuelta sin recrearlo.
+tanto con `push` —que lo lee de vuelta sin recrearlo— como en la migración base
+`0000_baseline.sql`, donde quedó escrito con `IF NOT EXISTS` para que aplicarlo sobre una base
+que ya lo tiene no haga nada.
 
-Reproducirlo en un entorno nuevo es, por tanto, el paso de base de la ruta de reinicio limpio
-de `AGENTS.md`: `npm run db:push`. Comprobación de que quedó puesto:
+**Que sobreviva a `db:generate` es lo que hay que vigilar.** Si una versión futura de
+`drizzle-kit` dejara de emitirlo, la migración generada saldría sin él y un entorno nuevo
+quedaría sin la restricción. Por eso, al generar una migración, **se lee el `.sql` antes de
+subirlo**.
+
+Reproducirlo en un entorno nuevo es el paso de base de la ruta de reinicio limpio de
+`AGENTS.md`: `npm run db:migrate`. Comprobado el 25/09/2026 contra una base recién creada,
+vacía: las migraciones dejan las tres tablas, las 34 restricciones y los seis índices, con el
+índice parcial idéntico al que había dejado `push`. Comprobación de que quedó puesto:
 
 ```sql
 SELECT indexdef FROM pg_indexes WHERE indexname = 'one_running_session';
 ```
 
 `npm run test:integration` hace exactamente esa consulta y falla si el índice no está. Es una
-guardia deliberada: si una versión futura de `drizzle-kit` dejara de emitirlo, un clon limpio
-quedaría sin la restricción y nadie se enteraría hasta que convivieran dos sesiones en curso.
+guardia deliberada: si el índice se perdiera por el camino —una versión de `drizzle-kit` que
+deje de emitirlo, una migración generada sin revisar— un clon limpio quedaría sin la
+restricción y nadie se enteraría hasta que convivieran dos sesiones en curso.
 
 ## Agrupación por día
 

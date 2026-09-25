@@ -98,17 +98,16 @@ export type SessionTypeRow = typeof sessionTypes.$inferSelect;
  * `minutes_override` existe desde el primer día a propósito: agregarlo después
  * obligaría a migrar sesiones ya registradas (RF-25, RF-2H).
  *
- * **`one_running_session` se declara aquí y lo aplica `npm run db:push`.** Es
- * el índice único parcial del invariante 1 y va sobre la expresión constante
+ * **`one_running_session` se declara aquí y lo aplica `npm run db:migrate`.**
+ * Es el índice único parcial del invariante 1 y va sobre la expresión constante
  * `(true)`, una forma que se temía que `drizzle-kit` no supiera expresar. Se
  * comprobó y sí la expresa: emite
  * `CREATE UNIQUE INDEX "one_running_session" ON "sessions" USING btree ((true))
- * WHERE "sessions"."ended_at" is null`, y una segunda corrida de `push`
- * responde "No changes detected", es decir que también lo lee de vuelta sin
- * recrearlo. Por eso no hace falta ningún paso de SQL manual: un clon limpio
- * que corra `db:push` queda con la restricción puesta. La prueba de integración
- * verifica que el índice existe, para que un cambio de versión que dejara de
- * emitirlo no pase inadvertido.
+ * WHERE "sessions"."ended_at" is null`, y eso es literalmente lo que quedó
+ * escrito en `migrations/0000_baseline.sql`. Por eso no hace falta ningún paso
+ * de SQL manual: un clon limpio que corra `db:migrate` queda con la restricción
+ * puesta. La prueba de integración verifica que el índice existe, para que una
+ * migración generada sin él no pase inadvertida.
  */
 export const sessions = pgTable(
   'sessions',
