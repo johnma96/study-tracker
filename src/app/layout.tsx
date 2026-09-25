@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
 import { loadSessionSnapshot } from "@/app/current-session";
+import { TooltipProvider } from "@/ui/primitives/tooltip";
 import { SessionBar } from "@/ui/session-bar";
 
 const geistSans = Geist({
@@ -46,8 +47,15 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        <SessionBar snapshot={snapshot} />
-        {children}
+        {/*
+          Un solo proveedor para toda la app, puesto antes de abrir R3, R4 y R5
+          en paralelo: si cada rebanada lo montara por su cuenta, las tres
+          tocarían este archivo.
+        */}
+        <TooltipProvider>
+          <SessionBar snapshot={snapshot} />
+          {children}
+        </TooltipProvider>
       </body>
     </html>
   );

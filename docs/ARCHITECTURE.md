@@ -202,7 +202,13 @@ infra/
   ├ db/         Esquema Drizzle, cliente, migraciones
   └ repos/      Implementaciones de los puertos de core/ports
 ui/             Componentes de presentación, sin acceso a datos
+  └ primitives/ Primitivas de shadcn/ui. Las escribe `npx shadcn add`, no se editan a mano
 ```
+
+**shadcn/ui escribe en `src/ui/`, no en `src/components/`.** `components.json` redirige sus
+alias (`ui` → `@/ui/primitives`, `utils` → `@/ui/utils`) para que las primitivas queden en la
+capa de presentación que ya existía, en vez de abrir una carpeta paralela que nadie documentó.
+Un `npx shadcn add <componente>` respeta esos alias sin configuración adicional.
 
 **La regla que importa:** `core/` no importa nada de `app/`, `infra/` ni `ui/`. Es la única
 regla de capas que se verifica automáticamente.
@@ -247,7 +253,8 @@ npm install drizzle-orm @neondatabase/serverless
 npm install -D drizzle-kit
 ```
 
-**Vitest entra en R1, no en R0**, y **shadcn/ui en R3**. R0 no tiene lógica de dominio que
+**Vitest entra en R1, no en R0**, y **shadcn/ui y Recharts justo antes de R3**, en `main`, como
+preparación del abanico de R3, R4 y R5 (decisión 22). R0 no tiene lógica de dominio que
 probar ni tableros que construir; instalarlos antes es configuración para código que todavía
 no existe. `docs/ROADMAP.md` manda sobre el alcance de cada rebanada.
 
@@ -299,3 +306,6 @@ APP_TIMEZONE=America/Bogota
 | 19 | La migración base se escribe idempotente, no se marca a mano como aplicada | 25/09/2026 | Las dos bases ya tenían el esquema y ninguna historial. Insertar el registro de control a mano exigía SQL manual contra producción, que es el procedimiento que este cambio elimina. Idempotente, cada base se auto-marca en su primera corrida y el mismo archivo sirve para una base vacía |
 | 20 | `vercel-build` separado de `build`, no `migrate` encadenado a `build` | 25/09/2026 | `./init.sh` ejecuta `build`; encadenar ahí las migraciones volvería la puerta de entrada dependiente de Neon y aplicaría esquema en cada corrida. Vercel prefiere `vercel-build` cuando existe, así que el despliegue migra y el desarrollador no |
 | 21 | `db:push` se conserva renombrado a `db:push:emergency` | 25/09/2026 | Borrarlo dejaría sin herramienta la reparación de una base a medio aplicar, que la migración base idempotente no cubre. El nombre hace imposible usarlo por inercia |
+| 22 | shadcn/ui y Recharts se instalan en `main` antes del abanico, no dentro de R3 | 25/09/2026 | Precisa la decisión 7. Tres `shadcn init` o `add` en paralelo se pisan en `package.json`, `components.json` y `globals.css`. Se instaló además un juego base de primitivas (`button`, `card`, `input`, `label`, `textarea`, `select`, `badge`, `table`, `tooltip`, `chart`) y el `TooltipProvider` en el layout, para que ningún agente necesite tocar esos archivos compartidos |
+| 23 | Se acepta `cn` en lugar de `clsx` + `tailwind-merge` | 25/09/2026 | Es lo que instala shadcn 4.21. Lo publica el propio autor de shadcn (`shadcn-ui/cn`). Riesgo registrado: es 0.x y muy reciente; si da problemas, `src/ui/utils.ts` y los imports de `src/ui/primitives/` son lo único que cambia para volver a `clsx` + `tailwind-merge` |
+| 24 | Modo oscuro por `prefers-color-scheme`, no por clase `.dark` | 25/09/2026 | `shadcn init` declara un variant por clase que exige un conmutador de tema inexistente; con él, la interfaz de R1 y R2 quedaba siempre en claro. Se conserva el comportamiento anterior |
