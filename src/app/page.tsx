@@ -1,4 +1,5 @@
 import { loadSessionSnapshot } from '@/app/current-session';
+import { StatsSection } from '@/app/stats-section';
 import type { Program } from '@/core/model/program';
 import type { SessionType } from '@/core/model/session-type';
 import { toCivilDateInAppZone } from '@/core/services/timezone';
@@ -124,6 +125,8 @@ export default async function Home() {
               todayInAppZone={today}
             />
           </section>
+
+          <StatsSection programs={programs} sessionTypes={sessionTypes} nowIso={snapshot.nowIso} />
 
           <section className="rounded-lg border border-black/10 p-6 dark:border-white/15">
             <h2 className="text-xl font-semibold">Nuevo programa</h2>
