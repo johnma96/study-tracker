@@ -145,6 +145,60 @@ Auth.js con un proveedor OAuth y lista blanca por variable de entorno.
   la base solo tenga datos de prueba puede esperar. En el momento en que registre sesiones
   reales que te importe perder o exponer, es obligatoria antes del siguiente despliegue.
 
+### R8 — Contexto de programa · 1-2 sesiones
+
+Un selector de programa gobierna la página entera: al elegir uno, todo lo que se ve corresponde
+a ese programa.
+
+- **El estado vive en la URL** (`/?programa=<id>`), no en el cliente: es compartible, sobrevive a
+  recargar y funciona con Server Components sin estado de cliente. `todos` es el valor por
+  defecto.
+- **Mapa de calor:** con «Todos» suma las sesiones de todos los programas —responde «qué días
+  trabajé, en lo que sea»—; al elegir uno, muestra solo ese. Decidido así en vez de pintar un
+  mapa pequeño por programa, que informa más pero se vuelve ilegible con varios.
+- Totales, cadencia, métricas y evidencia se filtran igual. El cronómetro preselecciona el
+  programa del contexto.
+- **La lógica de filtrado va en `core/services`**, probada sin base de datos.
+
+- **Verificación ejecutable:** `npm run test` cubre el filtrado por programa y el caso «todos»,
+  incluida una sesión de otro programa que no debe contarse en los totales del seleccionado;
+  revertir el filtro hace fallar la suite.
+- **Confirmación humana:** elegir un programa cambia mapa, totales, métricas y evidencia; la URL
+  refleja la selección y recargar la conserva.
+
+**No incluye maquetación.** La página sigue en una columna: reorganizarla es R9.
+
+### R9 — Reorganización visual · 2 sesiones
+
+- **Jerarquía**: barra de sesión y selector arriba; luego acción (cronómetro y registro manual);
+  luego avance (totales, mapa, cadencia); métricas; evidencia; y **administración de programas al
+  final**, porque se usa una vez cada varias semanas y hoy compite con lo diario.
+- **Dos columnas en escritorio, una en móvil.** El contenedor pasa de `max-w-2xl` a `max-w-6xl`.
+  La degradación a una columna no es opcional: la verificación de producción se hace desde el
+  teléfono.
+- **Selector de sesión en la evidencia** (lo que se había planteado como R10, absorbido aquí):
+  un desplegable con las sesiones del programa —fecha · tipo · duración— y debajo solo los
+  artefactos de esa sesión más el formulario. Desaparecen las N tarjetas.
+
+  > Es la deduplicación que R7 evaluó y no hizo. Entonces se concluyó que eliminar un listado era
+  > rediseño y no limpieza, y la conclusión era correcta: el mecanismo que faltaba es una
+  > selección explícita, no un borrado.
+
+- **Verificación ejecutable:** `npm run test` y `npm run test:integration` siguen pasando; no hay
+  cambio de datos ni de dominio.
+- **Confirmación humana:** la página se lee bien en escritorio a dos columnas y en teléfono a
+  una; elegir una sesión en evidencia muestra solo la suya.
+
+### Por qué R8 y R9 van en serie, no en paralelo
+
+Las dos rediseñan la misma superficie y reescriben `page.tsx`. R9 acomoda secciones cuyas props
+cambia R8, así que maquetar antes obliga a rehacer.
+
+Es la lección del abanico de R3-R5 aplicada: la tabla de conflictos de entonces acertó los cinco
+choques de archivos y **no previó el solapamiento conceptual**. Aquí ese solapamiento es evidente
+de antemano. **El abanico paga cuando las unidades no comparten lecturas ni componentes**, y
+estas comparten la página entera.
+
 ## Paralelización de R3, R4 y R5
 
 R3, R4 y R5 dependen de R2 pero **no entre sí**. Es el único punto del MVP donde el abanico es
