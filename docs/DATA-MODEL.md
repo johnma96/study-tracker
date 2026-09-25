@@ -1,8 +1,14 @@
 # DATA-MODEL.md — entidades, invariantes y DDL
 
 Especificación del modelo. El agente que implemente genera `src/infra/db/schema.ts` a partir
-de aquí. **El SQL de este documento no ha sido ejecutado**: es la especificación, no código
-verificado. Al implementar, aplícalo y corrige lo que el motor rechace.
+de aquí. **El SQL literal de este documento no se ejecuta nunca**: lo que corre contra el motor
+es el esquema de Drizzle, que `npm run db:push` traduce. Este DDL es el contrato que ese
+esquema debe cumplir. Al implementar una tabla nueva, aplícala y corrige aquí lo que el motor
+rechace.
+
+Estado al 25/09/2026: `programs`, `session_types` y `sessions` están aplicadas y verificadas
+contra Neon (PostgreSQL 18.6). `artifacts` (R4), `metrics` y `readings` (R5) siguen siendo solo
+especificación.
 
 ## Entidades
 
@@ -159,6 +165,32 @@ CREATE TABLE readings (
 > `gen_random_uuid()` requiere `pgcrypto` en Postgres anteriores a 13. Neon corre versiones
 > recientes donde la función está disponible de fábrica. Si el motor la rechaza, ejecuta
 > `CREATE EXTENSION IF NOT EXISTS pgcrypto;`.
+
+### Cómo se aplica `one_running_session` y cómo se reproduce
+
+**Con `npm run db:push`, sin ningún paso manual.** Se temía que `drizzle-kit` no supiera
+expresar un índice único sobre una expresión constante y hubiera que aplicarlo con SQL suelto.
+Se comprobó el 25/09/2026 con `drizzle-kit` 0.31.11 sobre PostgreSQL 18.6 y sí sabe: de
+la declaración de `src/infra/db/schema.ts` emite
+
+```sql
+CREATE UNIQUE INDEX "one_running_session" ON "sessions" USING btree ((true))
+  WHERE "sessions"."ended_at" is null;
+```
+
+y una segunda corrida de `push` responde *"No changes detected"*, es decir que también lo lee
+de vuelta sin recrearlo.
+
+Reproducirlo en un entorno nuevo es, por tanto, el paso de base de la ruta de reinicio limpio
+de `AGENTS.md`: `npm run db:push`. Comprobación de que quedó puesto:
+
+```sql
+SELECT indexdef FROM pg_indexes WHERE indexname = 'one_running_session';
+```
+
+`npm run test:integration` hace exactamente esa consulta y falla si el índice no está. Es una
+guardia deliberada: si una versión futura de `drizzle-kit` dejara de emitirlo, un clon limpio
+quedaría sin la restricción y nadie se enteraría hasta que convivieran dos sesiones en curso.
 
 ## Agrupación por día
 

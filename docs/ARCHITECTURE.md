@@ -62,13 +62,19 @@ Recuperación, unos cinco minutos:
 ```bash
 # 1. En el panel de Neon, crear de nuevo un branch dev desde el principal
 # 2. Copiar su cadena pooled a DATABASE_URL en .env
-npm run db:push     # aplica el esquema
-npm run db:seed     # siembra, es idempotente
+npm run db:push          # aplica el esquema, con sus índices
+npm run db:seed          # siembra, es idempotente
+npm run test:integration # comprueba que la base quedó utilizable
 ```
 
 Un branch de Neon es un clon *copy-on-write* del padre, así que nace con el esquema y los datos
 del principal ya adentro: `db:push` suele reportar "No changes detected" y la semilla "ya
 presente". Es lo esperado, no una señal de que algo falló.
+
+`db:push` es también lo que crea el índice único parcial `one_running_session`, del que depende
+el invariante "como máximo una sesión en curso". Por eso la comprobación final no sobra: si el
+índice faltara, la aplicación seguiría pareciendo sana y admitiría dos sesiones a la vez. El
+detalle está en la sección correspondiente de `docs/DATA-MODEL.md`.
 
 Si el trabajo se extiende más allá del 02/10, conviene revisar en el panel si el TTL se puede
 extender o quitar, antes de que expire a mitad de una sesión.
@@ -175,3 +181,7 @@ APP_TIMEZONE=America/Bogota
 | 11 | El esquema de entrada vive en `core/services`, no en la Server Action | 25/09/2026 | Permite probar RF-14 y RF-44 sin levantar Next ni base de datos, que es la justificación declarada de la separación por capas. `zod` no viola la regla: no es React, Next, Drizzle ni la base |
 | 12 | El orden de RF-13 se calcula en `core/`, no en un `ORDER BY` | 25/09/2026 | Los empates y las fechas nulas son donde se esconden los errores; en SQL no se prueban sin base de datos |
 | 13 | `@types/node` sube de `^20` a `^24` | 25/09/2026 | Vitest 5 lo exige (`^22 \|\| >=24`) y el runtime real de la máquina es Node 24. La plantilla de `create-next-app` había dejado `^20` |
+| 14 | Pruebas de integración en `tests/integration/`, con configuración y comando propios | 25/09/2026 | `npm run test` debe poder correr en un clon limpio sin red ni `.env`, porque `init.sh` lo ejecuta. Mezclar las que tocan Neon volvería la puerta de entrada dependiente de la red y un branch caducado se leería como código roto |
+| 15 | El índice `one_running_session` se declara en el esquema de Drizzle, no en SQL suelto | 25/09/2026 | Se comprobó que `drizzle-kit` 0.31.11 sí emite el índice único sobre la expresión constante `(true)` y lo lee de vuelta sin recrearlo. Un paso manual habría dejado la restricción fuera de la ruta de reinicio limpio |
+| 16 | El reloj de referencia es `now()` del motor, no el del proceso de Node | 25/09/2026 | `started_at` lo pone la base; medir el cierre con otro reloj mezcla dos relojes que nadie sincroniza, y un desfase de segundos basta para violar `ended_after_started` o para restar tiempo trabajado |
+| 17 | `zod` no valida longitudes de `note` contra un CHECK del motor | 25/09/2026 | La aplicación puede ser más estricta que la base sin riesgo; lo peligroso es lo contrario, que acepte lo que el motor rechaza. Añadir CHECK por cada cota inventada haría migrar el esquema por un cambio de criterio de interfaz |

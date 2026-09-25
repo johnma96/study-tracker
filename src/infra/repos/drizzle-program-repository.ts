@@ -11,6 +11,7 @@ import {
   type ProgramRow,
   type SessionTypeRow,
 } from '@/infra/db/schema';
+import { isUniqueViolation } from '@/infra/db/unique-violation';
 
 /**
  * Implementación del puerto `ProgramRepository` con Drizzle sobre Neon.
@@ -38,30 +39,17 @@ function toSessionTypeDomain(row: SessionTypeRow): SessionType {
   return { id: row.id, programId: row.programId, code: row.code, label: row.label };
 }
 
-/** `unique_violation` de Postgres. Es el choque de `UNIQUE (program_id, code)`. */
-const UNIQUE_VIOLATION = '23505';
-
 /**
- * Detecta la violación de unicidad recorriendo la cadena de `cause`.
+ * El choque de `UNIQUE (program_id, code)` se detecta con
+ * `isUniqueViolation` de `@/infra/db/unique-violation`.
  *
- * Drizzle no propaga el error del driver tal cual: lo envuelve en un
- * `DrizzleQueryError` que **no** lleva la propiedad `code`, y deja el
- * `NeonDbError` original en `cause`. Mirar solo el error de primer nivel deja
- * la comprobación siempre en falso y la excepción de Postgres termina en la
- * cara del usuario — justo el defecto que este repositorio existe para evitar.
+ * La función estaba definida aquí en R1. R2 necesita exactamente la misma
+ * comprobación para el índice `one_running_session` (RF-22), así que se movió a
+ * un módulo propio en vez de copiarse: era una corrección que costó encontrar
+ * —Drizzle envuelve el error del driver y deja el `NeonDbError` en `cause`— y
+ * dos copias significan que solo una se mantendría. El comportamiento no
+ * cambió; el archivo de destino conserva la explicación completa.
  */
-function isUniqueViolation(error: unknown): boolean {
-  let current: unknown = error;
-
-  // Tope de profundidad: una cadena de causas cíclica colgaría el proceso.
-  for (let depth = 0; depth < 5 && typeof current === 'object' && current !== null; depth += 1) {
-    if ((current as { code?: unknown }).code === UNIQUE_VIOLATION) return true;
-    current = (current as { cause?: unknown }).cause;
-  }
-
-  return false;
-}
-
 export const drizzleProgramRepository: ProgramRepository = {
   /**
    * RF-13 — el orden lo decide `core/services/program-order`, no un ORDER BY.

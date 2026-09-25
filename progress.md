@@ -3,11 +3,13 @@
 ## Current State
 
 **Última actualización:** 25/09/2026
-**Feature activa:** ninguna. La siguiente es R2 — Cronómetro.
-**Estado del repositorio:** R0 y R1 en `passing`. Desplegado en
-<https://study-tracker-eight-sigma.vercel.app/>.
+**Feature activa:** ninguna.
+**Estado del repositorio:** R0, R1 y R2 en `passing`. El MVP ya cronometra y guarda sesiones,
+que era el criterio de corte de `docs/ROADMAP.md`: a partir de aquí todo es visualización sobre
+datos que ya se capturan. Desplegado en <https://study-tracker-eight-sigma.vercel.app/>.
 **Bloqueos:** ninguno. Branch `dev` de Neon en uso; **expira el 02/10/2026**.
-**Siguiente paso:** arrancar R2.
+**Siguiente paso:** R3, R4 o R5, en cualquier orden — son independientes entre sí. Antes,
+confirmar el despliegue de R2 desde un dispositivo fuera de la red corporativa.
 
 ---
 
@@ -435,3 +437,112 @@ salió el refuerzo del `.gitignore`.
 **Next session**
 
 R2 — Cronómetro.
+
+---
+
+### Sesión 8 — 25/09/2026 — R2, el cronómetro
+
+**Duración:** ~2 h
+**Objetivo:** implementar R2 completa —cronómetro, pausas y recuperación de sesión abandonada—
+con `RF-00`, `RF-20` a `RF-29`, `RF-2A` a `RF-2E` y `RF-2F` a `RF-2I`.
+
+**What was done**
+
+R2 cerrada en `passing`. Las tres partes fueron juntas, como exigía el plan: índice único,
+pausas y válvula de escape.
+
+- **El tiempo se deriva de `started_at`, no de un contador.** No existe ninguna columna de
+  "tiempo transcurrido". `core/services/session-duration.ts` calcula todo a partir de las
+  marcas almacenadas, y el reloj de la interfaz llama a esa misma función en cada tic con el
+  valor que vino de la base. Comprobado sin navegador: con una sesión de hace 90 minutos en la
+  base, el HTML que devuelve `curl` ya trae `1:30:00`.
+- **`one_running_session` lo aplica `npm run db:push`.** Se temía que `drizzle-kit` no supiera
+  expresar un índice único sobre la expresión constante `(true)`. Se comprobó y sí sabe, y
+  además lo lee de vuelta sin recrearlo. Queda declarado en `src/infra/db/schema.ts`, dentro de
+  la ruta de reinicio limpio, en vez de en un paso manual que un clon nuevo se saltaría.
+- **Recuperación implementada con el índice, no después.** La barra de sesión vive en el layout
+  (`RF-2I`), así que desde cualquier vista se puede detener o descartar (`RF-2F`), y una sesión
+  abierta hace más de ocho horas abre el diálogo de las tres opciones de `RF-2G`, con la
+  duración real guardándose en `minutes_override` (`RF-2H`).
+- **Pausas y `minutes_override` desde el primer día**, como pedía el plan: añadirlos después
+  habría implicado migrar sesiones reales.
+- **Dos niveles de prueba.** 118 pruebas de `core/` sin base de datos, con los seis casos de la
+  tabla de `docs/DATA-MODEL.md` uno a uno; y 8 de integración contra el branch `dev`, que es
+  donde viven las tres comprobaciones que solo tienen sentido contra la base real.
+- **La detección de violación de unicidad se movió a `src/infra/db/unique-violation.ts`.** Era
+  la corrección de R1 —Drizzle envuelve el error del driver y deja el `NeonDbError` en `cause`—
+  y R2 necesitaba exactamente la misma comprobación para el índice del cronómetro. Se movió en
+  vez de copiarse: dos copias de una corrección que costó encontrar significan que solo una se
+  mantiene. El comportamiento de R1 no cambió.
+
+**Decisions**
+
+Registradas también en la tabla de `docs/ARCHITECTURE.md` con los números 14 a 17.
+
+1. Pruebas de integración separadas, con configuración y comando propios (`test:integration`).
+   `npm run test` tiene que poder correr en un clon limpio sin red ni `.env`, porque `init.sh`
+   lo ejecuta.
+2. El índice se declara en el esquema de Drizzle, no en SQL suelto, porque se comprobó que
+   `drizzle-kit` lo emite bien.
+3. El reloj de referencia es `now()` del motor y no el del proceso de Node: `started_at` lo
+   pone la base, y medir el cierre con otro reloj mezcla dos relojes que nadie sincroniza.
+4. Las cotas de `note`, `stuck_minutes` y `minutes_override` viven solo en `zod`, sin CHECK
+   equivalente. La aplicación puede ser más estricta que el motor; lo peligroso es lo contrario.
+5. La sesión manual (`RF-26`) guarda `ended_at = started_at + minutos` y **no** usa
+   `minutes_override`: así la sesión manual y la cronometrada se calculan con la misma regla.
+
+**Issues**
+
+- **`db.execute()` del driver HTTP de Neon devuelve `{ rows: [...] }`, no un arreglo**, y
+  `now()` llega como cadena en formato de Postgres (`2026-09-25 12:00:46.381862+00`), que no es
+  ISO-8601. Pasarla a `new Date()` depende de la tolerancia del motor de JavaScript. Se pide
+  `extract(epoch from now())`: un número no tiene ambigüedad de formato ni de zona.
+- El servidor de desarrollo de una sesión anterior seguía vivo en el puerto 3000. `next dev`
+  lo detecta y aborta con instrucciones claras; no hizo falta más.
+
+**Correcciones al harness y a la especificación**
+
+Todas sobre defectos comprobados, no sobre preferencias de redacción.
+
+1. **La ruta de reinicio limpio de `AGENTS.md` era falsa.** Prometía llegar a un estado
+   ejecutable con `clone`, `.env`, `init.sh` y `npm run dev`, pero `init.sh` no toca la base:
+   sobre un branch de Neon recién creado, el servidor arrancaba sin tablas. Con R2 el agujero
+   es peor, porque `db:push` es lo que crea el índice único. Se añadieron `db:push` y `db:seed`.
+2. **`docs/ROADMAP.md` R2 no nombraba el comando de la prueba de integración**, que es justo lo
+   que la regla "todo criterio de hecho debe nombrar un comando" existe para evitar. Ahora dice
+   `npm run test:integration`.
+3. **El campo `verification` de R2 en `feature_list.json` decía "más tres pruebas manuales"**,
+   redacción anterior a la corrección del harness: contradecía tanto el ROADMAP como la regla
+   de que la confirmación humana no bloquea. Reescrito.
+4. **`docs/DATA-MODEL.md` declaraba que su SQL "no ha sido ejecutado"**, lo que dejó de ser
+   cierto con `programs`, `session_types` y ahora `sessions`. Se precisó: el SQL literal no se
+   ejecuta nunca —lo que corre es el esquema de Drizzle— y se dice qué tablas están aplicadas
+   y cuáles siguen siendo solo especificación.
+5. **El `README.md` declaraba "R0 cerrada. En marcha: R1"**, es decir el mismo defecto que se
+   había corregido en `CLAUDE.md` en la sesión 6: estado mutable en un documento que cambia
+   poco. La corrección no se había propagado. Ahora remite a `feature_list.json` y a
+   `session-handoff.md`.
+6. **`init.sh` comprueba que exista `test:integration`, aunque no lo ejecute.** Añadirlo a los
+   comandos de verificación de `AGENTS.md` sin que nada vigilara su existencia habría repetido
+   el defecto del `--if-present`: un comando de verificación que desaparece sin que nada avise.
+   No se ejecuta porque la puerta de entrada del repositorio no puede depender de que Neon
+   responda. Comprobado borrando el script: sale con código 1.
+
+**Hallazgos fuera de alcance**
+
+- **`RF-30` (listar las sesiones de un programa) pertenece a R3**, así que R2 registra sesiones
+  que todavía no se pueden ver en una lista. Es coherente con el corte del plan, pero conviene
+  saberlo: hasta R3, la única forma de ver una sesión guardada es consultar la base.
+- **Los campos `verification` de R3 a R6 en `feature_list.json` siguen mezclando** verificación
+  ejecutable y confirmación humana en una sola frase, como hacía el de R2. No es falso —son
+  resúmenes—, pero se apartan del formato de dos partes que fija `AGENTS.md`. Se corregirán al
+  abrir cada rebanada.
+- Migraciones versionadas siguen pendientes y ahora urgen de verdad: con R2 hay datos que
+  importa no perder, y `drizzle-kit push` puede dejar `dev` y producción divergentes sin aviso.
+- `plannedSessions` sigue sin capturarse por la interfaz y `RF-36` lo necesita.
+- No existe edición ni borrado de programas.
+
+**Next session**
+
+R3, R4 o R5, en cualquier orden. Antes, confirmar el despliegue de R2 desde un dispositivo
+fuera de la red corporativa.

@@ -15,25 +15,33 @@ modelo.
 
 ## Estado
 
-**R0 cerrada. En marcha: R1 — Programas.**
+Este archivo **no** declara qué rebanada va en marcha, a propósito: un estado escrito en un
+documento que cambia poco se queda viejo y miente. Lo responden los archivos que se reescriben
+cada sesión — [`feature_list.json`](./feature_list.json), qué está hecho y con qué evidencia, y
+[`session-handoff.md`](./session-handoff.md), dónde quedó todo y qué sigue.
 
-Desplegada en **<https://study-tracker-eight-sigma.vercel.app/>** — lee la tabla `programs` de
-Neon y muestra el programa semilla. Ver [`session-handoff.md`](./session-handoff.md) para el
-estado exacto y el siguiente paso.
+Desplegada en **<https://study-tracker-eight-sigma.vercel.app/>**.
 
 ## Stack
 
 Next.js 16 (App Router) · TypeScript · React 19 · Tailwind · Drizzle ORM · Postgres (Neon) ·
-Vercel. shadcn/ui llega con R3 y Vitest con R1.
+Vitest · Vercel. shadcn/ui y Recharts entran con R3.
 
 ## Arranque
 
 ```bash
 cp .env.example .env     # completa DATABASE_URL con tu base de Neon
-./init.sh                # instala, verifica tipos, lint y build
-npm run db:push          # aplica el esquema a la base
-npm run db:seed          # siembra el programa inicial
+./init.sh                # instala, verifica tipos, lint, pruebas y build
+npm run db:push          # aplica el esquema a la base, con sus índices
+npm run db:seed          # siembra el programa inicial (idempotente)
 npm run dev              # http://localhost:3000
+```
+
+Las pruebas que tocan la base van aparte, porque necesitan `DATABASE_URL`:
+
+```bash
+npm run test             # dominio puro, sin red ni base de datos
+npm run test:integration # contra el branch dev de Neon
 ```
 
 ## Documentación

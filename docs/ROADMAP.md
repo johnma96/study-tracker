@@ -71,11 +71,11 @@ abandonada.
 
 - **Requerimientos:** RF-00, RF-20 … RF-29, RF-2A … RF-2I
 - **Verificación ejecutable:** `npm run test` cubre los seis casos de duración efectiva de
-  `docs/DATA-MODEL.md` sin tocar la base; más una prueba de integración que (1) inicia una
-  sesión, la lee de nuevo desde la base y comprueba que el tiempo se deriva de `started_at`,
-  (2) intenta iniciar una segunda y verifica que el índice único la rechaza, (3) fabrica una
-  sesión con `started_at` de hace 9 horas y comprueba que la consulta de recuperación la
-  detecta y que cerrarla libera el índice.
+  `docs/DATA-MODEL.md` sin tocar la base; y `npm run test:integration`, contra el branch `dev`
+  de Neon, (1) inicia una sesión, la lee de nuevo desde la base y comprueba que el tiempo se
+  deriva de `started_at`, (2) intenta iniciar una segunda y verifica que el índice único la
+  rechaza, (3) fabrica una sesión con `started_at` de hace 9 horas y comprueba que la consulta
+  de recuperación la detecta y que cerrarla libera el índice.
 - **Confirmación humana:** iniciar, cerrar el navegador, reabrir y ver el cronómetro corriendo
   con el tiempo correcto.
 

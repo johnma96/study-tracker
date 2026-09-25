@@ -55,7 +55,7 @@ npm install
 # que pasa. Durante toda la rebanada R0 las pruebas "pasaron" porque no existian.
 # Aqui cada script requerido se exige de forma explicita.
 
-require_script() {
+script_existe() {
   local nombre="$1"
   if ! node -e "process.exit(require('./package.json').scripts?.['$nombre'] ? 0 : 1)"; then
     echo "" >&2
@@ -64,15 +64,34 @@ require_script() {
     echo "Agregalo, o corrige AGENTS.md si de verdad ya no aplica." >&2
     exit 1
   fi
+}
+
+require_script() {
+  local nombre="$1"
+  script_existe "$nombre"
   echo "--> $nombre"
   npm run "$nombre"
+}
+
+# Solo se comprueba que exista: no se ejecuta aqui.
+# `test:integration` necesita red y DATABASE_URL, y esta puerta de entrada no
+# puede depender de que Neon responda: un branch caducado se leeria como codigo
+# roto. Pero si el script desapareciera del package.json, la evidencia de R2
+# dejaria de ser reproducible sin que nada avisara, que es el mismo defecto del
+# `--if-present` con otra cara.
+declare_script() {
+  local nombre="$1"
+  script_existe "$nombre"
+  echo "    $nombre declarado (se ejecuta a mano: requiere base de datos)"
 }
 
 require_script check
 require_script lint
 require_script test
+declare_script test:integration
 require_script build
 
 echo ""
 echo "Init OK."
+echo "Pruebas contra la base: npm run test:integration"
 echo "Levanta el servidor con: npm run dev"

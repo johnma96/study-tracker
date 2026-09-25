@@ -33,20 +33,30 @@ Before writing code, en este orden:
 ## Verification Commands
 
 ```bash
-./init.sh            # instala, verifica tipos, lint y build. Puerta de entrada.
-npm run check        # next typegen && tsc --noEmit
-npm run lint         # eslint
-npm run test         # vitest run  (pruebas de core/, sin base de datos)
-npm run test:watch   # vitest en modo observador
-npm run build        # next build
-npm run dev          # servidor local
-npm run db:push      # aplica el esquema a la base de datos
-npm run db:seed      # siembra los datos iniciales (idempotente)
+./init.sh                 # instala, verifica tipos, lint, pruebas y build. Puerta de entrada.
+npm run check             # next typegen && tsc --noEmit
+npm run lint              # eslint
+npm run test              # vitest run  (pruebas de core/, sin base de datos)
+npm run test:watch        # vitest en modo observador
+npm run test:integration  # vitest contra el branch dev de Neon. Requiere DATABASE_URL.
+npm run build             # next build
+npm run dev               # servidor local
+npm run db:push           # aplica el esquema a la base de datos, con sus índices
+npm run db:seed           # siembra los datos iniciales (idempotente)
 ```
 
 `check` **debe** incluir `next typegen` antes de `tsc`. Sobre un clon limpio, `tsc --noEmit`
 a secas falla: la plantilla de Next 16 usa tipos globales como `LayoutProps<"/">` que Next
 genera en `.next/types`. Sin el typegen previo, un clon recién hecho no compila.
+
+**`test` y `test:integration` están separados a propósito.** `test` recoge solo `src/core/**`
+y corre sin red ni base de datos, y por eso puede formar parte de `./init.sh`: la puerta de
+entrada del repositorio no puede depender de que Neon responda, o un branch caducado se leería
+como código roto. `test:integration` cubre lo que **no tiene sentido** probar sin base —que el
+tiempo se derive de la marca almacenada, que un índice único rechace lo que debe rechazar— y se
+ejecuta a mano. `init.sh` comprueba que el script **exista**, aunque no lo ejecute: un comando
+de verificación que desaparece del `package.json` sin que nada avise es el mismo defecto del
+`--if-present` con otra cara.
 
 ## Definition of Done
 
@@ -162,8 +172,17 @@ Cualquier sesión nueva debe poder llegar a un estado ejecutable con estos pasos
 git clone <repo> && cd study-tracker
 cp .env.example .env    # completa DATABASE_URL
 ./init.sh               # instala y verifica
+npm run db:push         # crea tablas e índices en esa base
+npm run db:seed         # siembra el programa inicial (idempotente)
 npm run dev             # servidor en marcha
 ```
+
+Los dos pasos de base **no son opcionales y antes faltaban aquí**: `init.sh` no toca la base,
+así que sobre una base vacía —un branch de Neon recién creado— el servidor arrancaba sin tablas
+y la aplicación no servía para nada. `db:push` es además lo que crea el índice único
+`one_running_session`, del que depende el invariante "como máximo una sesión en curso": sin
+ese paso, un clon limpio queda sin la restricción y nada lo avisa hasta que conviven dos
+sesiones. Si la base ya tenía el esquema, los dos comandos no hacen nada y lo dicen.
 
 Si esta secuencia no funciona desde un clon limpio, arreglarla es más prioritario que
 cualquier feature. El estado del repositorio, no la memoria de nadie, es lo que permite

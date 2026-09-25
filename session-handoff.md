@@ -7,99 +7,131 @@
 
 ## Current Objective
 
-Implementar **R2 — Cronómetro**: `RF-00` y `RF-20` a `RF-29`, más las pausas (`RF-2A` a `RF-2E`)
-y la recuperación de sesión abandonada (`RF-2F` a `RF-2I`).
+**Ninguno en marcha.** R2 — Cronómetro quedó cerrada en `passing` y no hay ninguna feature en
+`active`, que es el estado normal cuando nadie está trabajando.
 
-Es el corazón del MVP y la rebanada más grande del plan: dos sesiones estimadas. Las tres partes
-van **juntas**, no en tandas. El índice único de "máximo una sesión en curso" y el flujo de
-recuperación son la misma moneda: implementar el índice sin la válvula de escape deja la
-aplicación en un estado del que el usuario no puede salir sin entrar a la base a mano.
+Con R2 cerrada se cumple el criterio de corte que fija `docs/ROADMAP.md`: la herramienta **ya
+es útil**. Cronometra una sesión, la guarda y sobrevive a cerrar el navegador. Todo lo que
+queda es visualización sobre datos que ya se están capturando.
+
+La siguiente rebanada la elige el paso 8 del *Startup Workflow*: R3, R4 y R5 dependen solo de
+R2 y son independientes entre sí, así que califican las tres y se puede empezar por cualquiera.
+R6 es compuerta, no etapa: se vuelve obligatoria en el momento en que la base guarde sesiones
+reales que importe perder o exponer — y R2 es justo la rebanada que empieza a generarlas.
 
 ## What was done
 
-**R1 cerrada en `passing`.** Crear y listar programas, tipos de sesión propios de cada programa
-y la semilla ampliada. `RF-10` a `RF-15` implementados y verificados en local.
+**R2 cerrada en `passing`.** `RF-00`, `RF-20` a `RF-29`, `RF-2A` a `RF-2E` y `RF-2F` a `RF-2I`
+implementados y verificados en local. Las tres partes —índice único, pausas y recuperación—
+fueron juntas, no en tandas.
 
-- **Vitest en marcha.** 51 pruebas en 5 archivos, todas sobre `core/` y sin base de datos.
-  `npm run test` y `npm run test:watch` existen y `./init.sh` los ejecuta.
-- **La regla completa de la *Definition of Done* se cumplió**: al revertir `sortPrograms()` y el
-  límite de 120 caracteres de `RF-14`, fallan 13 pruebas; restaurado el cambio, vuelven las 51.
-- **Validación en el servidor (`RF-44`).** El esquema `zod` vive en
-  `src/core/services/program-input.ts`, no en la Server Action, para poder probarlo sin levantar
-  Next ni base de datos. `src/app/actions.ts` es solo el adaptador de `FormData`.
-- **`session_types` en Neon**, con `UNIQUE (program_id, code)`, `ON DELETE CASCADE` y `CHECK` de
-  longitud. La semilla dejó `E` Estudio, `C` Construcción, `K` Consolidación, `V` Checkpoint, y
-  es idempotente.
-- **Un defecto real corregido:** Drizzle envuelve el error del driver en `DrizzleQueryError` y
-  deja el `NeonDbError` en `cause`. La detección del código `23505` solo funciona recorriendo la
-  cadena de `cause`; sin eso, un código de tipo de sesión repetido llegaba al usuario como
-  excepción de Postgres.
-
-**`metrics` y `readings` no se crearon.** Son tablas de R5, junto con la siembra de la métrica
-"Harness score". `docs/DATA-MODEL.md` ya lo dice explícitamente en su sección de datos semilla.
+- **El tiempo se deriva de `started_at`.** No hay ninguna columna de tiempo transcurrido ni
+  ningún contador en el navegador. `src/core/services/session-duration.ts` lo calcula todo
+  desde las marcas almacenadas, y el reloj de la interfaz llama a esa misma función en cada tic
+  con el valor que vino de la base. Comprobado sin navegador: con una sesión de hace 90 minutos
+  en la base, el HTML que devuelve `curl` ya trae `1:30:00`.
+- **`one_running_session` está en la base y lo aplica `npm run db:push`.** Se temía que
+  `drizzle-kit` no supiera expresar un índice único sobre la expresión constante `(true)`; se
+  comprobó y sí lo emite, y además lo lee de vuelta sin recrearlo (`No changes detected` en la
+  segunda corrida). Por eso se declara en `src/infra/db/schema.ts` y no en un paso de SQL
+  manual: un clon limpio que corra `db:push` queda con la restricción puesta. El detalle y la
+  consulta de comprobación están en `docs/DATA-MODEL.md`.
+- **La válvula de escape existe desde el primer día.** La barra de sesión vive en el layout, así
+  que el estado se ve y la sesión se puede detener o descartar desde cualquier vista
+  (`RF-2I`, `RF-2F`). Una sesión abierta hace más de ocho horas abre el diálogo de recuperación
+  con las tres opciones de `RF-2G`, y la duración indicada se guarda en `minutes_override`
+  (`RF-2H`).
+- **Dos niveles de prueba.** `npm run test`: 118 pruebas de `core/` sin base de datos, con los
+  seis casos de duración efectiva de `docs/DATA-MODEL.md` uno a uno, incluido el que más se
+  olvida —`minutesOverride` gana incluso sobre las pausas—. `npm run test:integration`: 8
+  pruebas contra el branch `dev` de Neon con las tres comprobaciones que solo tienen sentido
+  contra la base real.
+- **La regla completa de la *Definition of Done* se cumplió, comprobándola.** Al revertir la
+  consolidación de la pausa abierta en `decideStop` (`RF-2D`), falla la prueba que la cubre con
+  60 minutos en vez de 50; restaurado, vuelven las 118. Al borrar el índice
+  `one_running_session` de la base, fallan 6 de las 8 pruebas de integración; restaurado con
+  `npm run db:push`, vuelven las 8.
+- **Seis correcciones al harness y a la especificación**, todas sobre defectos comprobados.
+  Están detalladas en la entrada de la sesión 8 de `progress.md`. La de más consecuencia: la
+  *Clean restart path* de `AGENTS.md` prometía un estado ejecutable sin pasar por `db:push`, y
+  `db:push` es lo que crea el índice único.
 
 ## What is broken or unverified
 
 - **Producción sin verificar.** La VPN corporativa bloquea `vercel.app` y la interceptación TLS
-  impide comprobarlo por línea de comandos. Toda verificación de despliegue exige un dispositivo
-  fuera de la red corporativa. R1 no tiene la URL de producción en su criterio de hecho —eso era
-  exclusivo de R0—, así que no bloquea el cierre, pero **conviene confirmar el despliegue antes
-  de empezar R2**.
-- **Un solo branch de Neon.** Local y producción comparten base. La verificación de esta sesión
-  insertó y borró filas de prueba en la base que sirve producción. Antes de que R2 registre
-  sesiones reales, crear el branch `dev` deja de ser opcional.
-- **Sin migraciones versionadas.** `drizzle-kit push` sirve mientras la base solo tenga la fila
-  semilla. R2 es la rebanada en la que aparecen datos que importa no perder: el cambio a
-  migraciones versionadas debería ser trabajo propio, no un agregado dentro de R2.
-- **`APP_TIMEZONE` sigue sin leerla ningún código.** R2 es donde `RF-00` empieza a pesar de
-  verdad. Según el análisis de `docs/ARCHITECTURE.md`, la zona debería ser una constante en
-  `core/` y no una variable de entorno: decídelo al implementar la agrupación por día.
-- **`CLAUDE.md` describe el repositorio como semilla sin código.** Es falso desde la sesión 4 y
-  el flujo de arranque lo hace leer en el paso 2, antes de `feature_list.json`. No se corrigió
-  por la regla "Stay in scope"; corrígelo al abrir la próxima sesión, antes de empezar R2.
-- **Ninguna feature quedó en `status: "active"`.** Es correcto: la política dice "como máximo
-  una". El caso 2 de la regla de selección elige R2, cuya única dependencia (R1) ya está en
-  `passing`.
+  impide comprobarlo por línea de comandos. El criterio de hecho de R2 no exige la URL de
+  producción —eso era exclusivo de R0— y la confirmación humana no bloquea, así que no impidió
+  el cierre. **Queda pendiente que el usuario lo confirme desde un dispositivo fuera de la red
+  corporativa:** iniciar una sesión, cerrar el navegador, reabrir y ver el cronómetro corriendo
+  con el tiempo correcto.
+- **Las sesiones guardadas todavía no se pueden ver en una lista.** `RF-30` pertenece a R3. Es
+  coherente con el corte del plan, pero hasta entonces la única forma de ver una sesión cerrada
+  es consultar la base.
+- **Sin migraciones versionadas.** `drizzle-kit push` sirvió mientras la base solo tenía la fila
+  semilla. Con R2 ya hay datos que importa no perder, y `push` puede dejar `dev` y producción
+  divergentes sin que nada avise. Debería ser trabajo propio, no un agregado dentro de otra
+  rebanada.
+- **`APP_TIMEZONE` sigue sin leerla ningún código, y ahora es deliberado.** `RF-00` se
+  implementó como constante de dominio en `src/core/services/timezone.ts`, siguiendo el análisis
+  de `docs/ARCHITECTURE.md`: una zona que no cambia entre entornos no debe ser variable de
+  entorno, porque si falta o se escribe mal en producción la agrupación por día se rompe en
+  silencio. La variable queda documentada en `.env.example` por si algún día la zona se vuelve
+  preferencia del usuario, en cuyo caso pertenece a la base de datos.
+- **`RF-40` se acerca.** R2 es la rebanada que empieza a generar sesiones reales. La
+  autenticación es una compuerta, no una etapa: antes del primer despliegue con datos que
+  importen, R6.
+- **Ninguna feature quedó en `status: "active"`.** Es lo correcto: cero activas es el estado
+  normal cuando nadie está trabajando.
 
 ## Files
 
-**Nuevos:** `vitest.config.mts`, `src/app/actions.ts`, `src/core/model/session-type.ts`,
-`src/core/services/` (`program-name.ts`, `program-order.ts`, `program-input.ts`,
-`session-type.ts`, `civil-date.ts`, `text.ts` y sus cinco archivos de prueba),
-`src/ui/form-state.ts`, `src/ui/labels.ts`, `src/ui/program-form.tsx`,
-`src/ui/session-type-form.tsx`.
+**Nuevos:** `src/core/model/session.ts`, `src/core/ports/session-repository.ts`,
+`src/core/services/timezone.ts`, `src/core/services/session-duration.ts`,
+`src/core/services/session-transitions.ts`, `src/core/services/session-input.ts` y sus cuatro
+archivos de prueba; `src/infra/db/unique-violation.ts`,
+`src/infra/repos/drizzle-session-repository.ts`; `src/app/session-actions.ts`,
+`src/app/current-session.ts`; `src/ui/session-view.ts`, `src/ui/session-form-state.ts`,
+`src/ui/session-clock.tsx`, `src/ui/session-bar.tsx`, `src/ui/session-action-button.tsx`,
+`src/ui/stop-session-form.tsx`, `src/ui/start-session-form.tsx`,
+`src/ui/manual-session-form.tsx`, `src/ui/session-recovery-dialog.tsx`;
+`vitest.integration.mts`, `tests/integration/session.integration.test.ts`.
 
-**Modificados:** `package.json`, `package-lock.json`, `scripts/seed.mjs`, `src/app/page.tsx`,
-`src/core/model/program.ts`, `src/core/ports/program-repository.ts`, `src/infra/db/schema.ts`,
-`src/infra/repos/drizzle-program-repository.ts`, `src/ui/program-card.tsx`, `AGENTS.md`,
+**Modificados:** `src/infra/db/schema.ts` (tabla `sessions`, índices y CHECK),
+`src/infra/repos/drizzle-program-repository.ts` (usa el detector de unicidad compartido),
+`src/app/layout.tsx` (barra de sesión, `force-dynamic`), `src/app/page.tsx`, `package.json`
+(script `test:integration`), `init.sh`, `AGENTS.md`, `README.md`, `docs/ROADMAP.md`,
 `docs/ARCHITECTURE.md`, `docs/DATA-MODEL.md`, `feature_list.json`, `progress.md` y este archivo.
 
 ## Blockers
 
-**Ninguno.** El branch `dev` de Neon quedó creado y `DATABASE_URL` local ya apunta a él; la
-cadena de producción vive solo en Vercel. Esquema y semilla verificados contra `dev`.
+**Ninguno.**
 
-**Aviso con fecha: el branch `dev` expira el 02/10/2026** (TTL de 7 días del panel de Neon).
+**Aviso con fecha: el branch `dev` de Neon expira el 02/10/2026** (TTL de 7 días del panel).
 Si un comando de base falla con error de conexión después de esa fecha, no es el código:
-recrear el branch y correr `npm run db:push` y `npm run db:seed`. El procedimiento está en
-`docs/ARCHITECTURE.md`.
+recrear el branch y correr `npm run db:push`, `npm run db:seed` y `npm run test:integration`.
+El procedimiento está en `docs/ARCHITECTURE.md`. El último comando no sobra: `db:push` es lo
+que crea el índice único, y sin él la aplicación parece sana y admite dos sesiones a la vez.
 
 ## Next Session
 
-Recommended Next Step: implementar **R2 — Cronómetro**.
+Recommended Next Step: **R3 — Totales y mapa de calor**, por dos razones: es la que hace
+visibles las sesiones que R2 ya guarda (`RF-30`), y es donde entra `shadcn/ui` y Recharts, que
+el resto de rebanadas van a reutilizar. R4 y R5 califican igual si se prefiere otro orden.
 
 1. `cd study-tracker` y confirmar con `pwd`. No trabajar desde el repositorio del curso: la
    terminal tiende a reposicionarse ahí sola.
-2. `./init.sh` — debe terminar en "Init OK" y ejecutar las 51 pruebas.
-3. Corregir el estado que `CLAUDE.md` declara. Es parte de la ruta de reinicio limpio.
-4. Antes de escribir código de sesiones, decidir el branch `dev` de Neon y si se pasa a
-   migraciones versionadas. Las dos cosas son más baratas ahora que con sesiones registradas.
-5. Escribir primero las pruebas de duración efectiva: los seis casos de la tabla de
-   `docs/DATA-MODEL.md` viven en `core/services` y se prueban sin base de datos.
-6. Implementar el índice único **junto con** el flujo de recuperación (`RF-2F` a `RF-2I`).
-7. `RF-21`: el tiempo transcurrido se deriva de la marca de inicio almacenada, nunca de un
-   contador en JavaScript. Es lo que hace que sobreviva a cerrar la pestaña.
-8. Cerrar según el procedimiento "End of Session" de `AGENTS.md`.
+2. `./init.sh` — debe terminar en "Init OK" y ejecutar las 118 pruebas.
+3. `npm run test:integration` — 8 pruebas contra `dev`. Si falla por conexión, el branch
+   caducó: ver *Blockers*.
+4. Poner la feature elegida en `active` antes de escribir código, y dejarla en `passing` o
+   `blocked` al cerrar.
+5. Para R3, la trampa conocida ya tiene herramienta: `toCivilDateInAppZone` de
+   `src/core/services/timezone.ts` convierte a `America/Bogota` y está probada con el caso de
+   las 23:40. Agrupar por `started_at::date` sin convertir es el error silencioso más probable
+   del modelo.
+6. Corregir el campo `verification` de la rebanada que se abra: los de R3 a R6 todavía mezclan
+   verificación ejecutable y confirmación humana en una sola frase.
+7. Cerrar según el procedimiento "End of Session" de `AGENTS.md`.
 
-Recordatorio de alcance: shadcn/ui y Recharts entran en **R3**, no antes. `metrics` y `readings`
-son de **R5**.
+Recordatorio de alcance: `metrics` y `readings` son de **R5**; la autenticación, de **R6**, que
+es compuerta y no etapa final.
