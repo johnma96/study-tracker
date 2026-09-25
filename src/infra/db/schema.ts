@@ -4,6 +4,7 @@ import {
   date,
   index,
   integer,
+  numeric,
   pgTable,
   text,
   timestamp,
@@ -155,3 +156,79 @@ export const sessions = pgTable(
 );
 
 export type SessionRow = typeof sessions.$inferSelect;
+
+// R5 — metrics y readings ----------------------------------------------------
+
+/**
+ * Esquema Drizzle de `metrics` (RF-60), transcrito del DDL de docs/DATA-MODEL.md.
+ *
+ * **Una métrica es un dato del programa, no un concepto del código.** El score
+ * de un curso, los módulos de una certificación o la nota de un diplomado son
+ * filas de esta tabla; el sistema grafica cualquier serie sin saber qué
+ * significa. Por eso ni el nombre ni la unidad tienen dominio cerrado.
+ *
+ * `numeric` se lee en modo `number`: por defecto Drizzle devuelve `numeric`
+ * como cadena, y un valor que el dominio compara (RF-63) no puede llegar como
+ * texto — `'9' > '10'` es verdadero.
+ *
+ * Como en R1, los CHECK de longitud **no** están en el DDL del documento: los
+ * añade esta rebanada para que el motor no acepte un párrafo como nombre o como
+ * unidad. Coinciden con `core/services/metric-input.ts`.
+ */
+export const metrics = pgTable(
+  'metrics',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    programId: uuid('program_id')
+      .notNull()
+      .references(() => programs.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    unit: text('unit'),
+    direction: text('direction').notNull().default('up'),
+    target: numeric('target', { mode: 'number' }),
+  },
+  (table) => [
+    unique('metrics_program_name').on(table.programId, table.name),
+    check('metrics_direction_valid', sql`${table.direction} in ('up','down')`),
+    check('metrics_name_length', sql`char_length(${table.name}) between 1 and 80`),
+    check(
+      'metrics_unit_length',
+      sql`${table.unit} is null or char_length(${table.unit}) between 1 and 24`,
+    ),
+  ],
+);
+
+export type MetricRow = typeof metrics.$inferSelect;
+
+/**
+ * Esquema Drizzle de `readings` (RF-61), transcrito del DDL de docs/DATA-MODEL.md.
+ *
+ * Borrar la métrica se lleva sus lecturas (invariante 6); borrar la sesión
+ * asociada **no**: la lectura sigue siendo un dato de progreso válido aunque ya
+ * no se sepa en qué sesión se tomó.
+ *
+ * **`created_at` no está en el DDL del documento.** Lo añade esta rebanada
+ * porque RF-63 compara "la última lectura" con "la anterior", y con solo
+ * `recorded_at` dos lecturas registradas en el mismo minuto no tienen orden
+ * definido: la comparación dependería del azar del motor. `created_at` es el
+ * desempate — la que se registró después es la última.
+ *
+ * El índice cubre la única consulta de lectura: las lecturas de una métrica en
+ * orden de tiempo, que es lo que se grafica (RF-62).
+ */
+export const readings = pgTable(
+  'readings',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    metricId: uuid('metric_id')
+      .notNull()
+      .references(() => metrics.id, { onDelete: 'cascade' }),
+    sessionId: uuid('session_id').references(() => sessions.id, { onDelete: 'set null' }),
+    value: numeric('value', { mode: 'number' }).notNull(),
+    recordedAt: timestamp('recorded_at', { withTimezone: true }).notNull().defaultNow(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index('readings_by_metric_time').on(table.metricId, table.recordedAt)],
+);
+
+export type ReadingRow = typeof readings.$inferSelect;
