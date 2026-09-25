@@ -149,7 +149,48 @@ Si cada agente hace estos pasos por su cuenta, colisionan.
    git worktree add ../study-tracker-r5 -b r5-metricas
    ```
 
-   Cada uno necesita su propio `npm install` y su propio `.env` con la cadena de **su** branch.
+   Los worktrees comparten el `.git`, **no** los archivos sin rastrear ni `node_modules`. Cada
+   uno necesita su propio `npm install` y su propio `.env`.
+
+4. **Entrega de las cadenas de conexión — protocolo.**
+
+   **No le pidas al usuario que pegue las cadenas en la conversación.** Una credencial pegada en
+   un chat queda en el transcript sin ninguna necesidad. El intercambio es este:
+
+   1. Crea los tres worktrees y **dile al usuario las rutas exactas**.
+   2. Pídele que pegue, a mano, la cadena **pooled** de cada branch de Neon en el `.env` de su
+      worktree correspondiente:
+
+      | Worktree | Branch de Neon |
+      |---|---|
+      | `../study-tracker-r3` | `dev-r3` |
+      | `../study-tracker-r4` | `dev-r4` |
+      | `../study-tracker-r5` | `dev-r5` |
+
+   3. Cuando te diga que está listo, **verifica sin imprimir los valores**: extrae el host de
+      cada `DATABASE_URL`, comprueba que los tres son **distintos entre sí** y distintos del de
+      `dev` y del de producción. Algo así:
+
+      ```bash
+      for d in ../study-tracker-r3 ../study-tracker-r4 ../study-tracker-r5; do
+        node -e "
+          const fs=require('fs');
+          const l=fs.readFileSync('$d/.env','utf8').split(/?
+/).find(x=>x.startsWith('DATABASE_URL='));
+          console.log('$d ->', l ? new URL(l.slice(13)).host.split('.')[0] : 'FALTA');
+        "
+      done
+      ```
+
+   4. Si dos worktrees apuntan a la misma base, **detente y avisa**. Es el fallo que más caro
+      sale: el índice `one_running_session` hará que las pruebas de integración de dos agentes
+      se estorben, y el síntoma será intermitente y sin causa aparente.
+
+   `.env` está cubierto por el `.gitignore` versionado, así que queda ignorado en los tres
+   worktrees automáticamente. Verifícalo igual con `git check-ignore`.
+
+5. **`npm install` y `npm run db:migrate` en cada worktree**, para que cada base quede marcada
+   con la migración base antes de que su agente empiece.
 
 ### Paso 1 — los tres agentes, en paralelo
 

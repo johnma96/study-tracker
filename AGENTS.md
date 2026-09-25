@@ -217,6 +217,14 @@ reiniciar.
 
 - **Nunca** subas secretos. `.env` está en `.gitignore`; documenta variables nuevas en
   `.env.example` con valores falsos.
+- **Nunca pidas una credencial en la conversación.** Si necesitas que el usuario aporte una
+  cadena de conexión, una clave o un token, pídele que la escriba **él mismo en el archivo que
+  corresponda** y que te avise cuando esté. Una credencial pegada en un chat queda en el
+  transcript sin ninguna necesidad, y el comando que la necesita puede correrlo él en una línea.
+- **Verifica las credenciales sin imprimirlas.** Para comprobar que una `DATABASE_URL` apunta a
+  donde debe, extrae y compara el **host**, nunca el valor completo. Vale también para tus
+  propias comprobaciones: un `grep` sobre el `.env` que imprima la línea entera deja el secreto
+  en la salida, y esa salida se queda en el registro de la sesión.
 - Este repositorio es personal. **No debe contener** código, datos, capturas ni nombres de
   sistemas internos de Protección S.A.
 - La aplicación no almacena datos personales de terceros. Si una feature futura lo requiriera,
