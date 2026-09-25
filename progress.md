@@ -3,11 +3,11 @@
 ## Current State
 
 **Última actualización:** 25/09/2026
-**Feature activa:** R1 — Programas
-**Estado del repositorio:** R0 cerrada en `passing`. Aplicación desplegada y sirviendo datos
-de Neon en <https://study-tracker-eight-sigma.vercel.app/>.
-**Bloqueos:** ninguno.
-**Siguiente paso:** instalar Vitest y arrancar R1 (`RF-10` a `RF-15`).
+**Feature activa:** ninguna. La siguiente es R2 — Cronómetro (el paso 8 de `AGENTS.md` la selecciona).
+**Estado del repositorio:** R0 y R1 en `passing`. Desplegado en
+<https://study-tracker-eight-sigma.vercel.app/>.
+**Bloqueo para R2:** falta el branch `dev` en Neon. Hoy local y producción comparten base.
+**Siguiente paso:** crear el branch `dev`, luego arrancar R2.
 
 ---
 
@@ -329,3 +329,61 @@ programa, y estrenar Vitest con la regla completa de la *Definition of Done*.
 
 Implementar R2 — Cronómetro. Es el corazón del MVP y la rebanada más grande: índice único,
 pausas y recuperación de sesión abandonada van juntos, no en tandas.
+
+---
+
+### Sesión 6 — 25/09/2026 — corrección del harness tras R1
+
+**Duración:** ~35 min
+**Objetivo:** cerrar los huecos del harness que salieron al construir R1. Sin cambios de producto.
+
+**What was done**
+
+Cuatro correcciones, todas sobre defectos comprobados, no sobre preferencias de redacción.
+
+1. **Criterios de hecho ejecutables.** Los siete criterios de `docs/ROADMAP.md` estaban escritos
+   como interacción humana ("creas un programa por la interfaz"), imposibles para un agente sin
+   navegador, mientras la *Definition of Done* exigía evidencia ejecutable. El harness pedía dos
+   cosas incompatibles. Ahora cada rebanada tiene **verificación ejecutable** (bloquea) y
+   **confirmación humana** (se registra, no bloquea), salvo R0, donde la cadena de despliegue es
+   el propósito y por eso sí bloquea.
+2. **`CLAUDE.md` ya no declara el estado del repositorio.** Decía "semilla, sin código todavía"
+   con dos rebanadas cerradas, y el flujo de arranque lo hace leer en el paso 2. La causa de
+   fondo era poner estado mutable en un documento que cambia poco; ahora remite a los archivos
+   que sí son dueños de cada dato.
+3. **Excepción de alcance para la documentación de arranque.** "Stay in scope" protegía el
+   código pero dejaba pudrirse los documentos que el propio harness declara más importantes que
+   cualquier feature. Ahora corregir un documento que **contradice la realidad** siempre está en
+   alcance. El límite: se corrige lo falso, no lo mejorable.
+4. **`init.sh` ya no da falso positivo.** `npm run <x> --if-present` termina en 0 sin imprimir
+   nada cuando el script no existe: durante toda R0 las pruebas "pasaron" porque no existían.
+   Ahora cada script requerido se exige explícitamente y falta alguno aborta con mensaje claro.
+   **Comprobado eliminando el script `test`:** sale con código 1 y el mensaje esperado.
+
+También se precisó la semántica de `active` en `feature_list.json`: significa "alguien la está
+trabajando ahora", no "es la siguiente". Cero activas es el estado normal en reposo.
+
+**Decisions**
+
+1. La confirmación humana se registra en `evidence` con quién verificó y desde dónde, pero no
+   bloquea `passing`. Una verificación que solo una persona puede hacer no puede ser requisito
+   de cada rebanada sin volver el harness inoperable para un agente.
+2. Si una regla de negocio solo se puede comprobar con un clic, está en la capa equivocada: se
+   mueve a `core/`. La interfaz se queda con lo que de verdad es presentación.
+
+**Issues**
+
+Ninguno.
+
+**Hallazgos fuera de alcance**
+
+- **Bloqueo para R2:** local y producción comparten branch de Neon. La verificación de R1 llegó
+  a insertar y borrar filas en la base que sirve el despliegue. Se limpió, pero con datos reales
+  sería inaceptable, y R2 es donde empiezan a existir. Requiere la consola de Neon.
+- Sigue pendiente pasar a migraciones versionadas antes de que haya datos que importe perder.
+- `plannedSessions` no se captura por la interfaz, y `RF-36` lo necesita.
+- No existe edición ni borrado de programas.
+
+**Next session**
+
+Crear el branch `dev` en Neon y arrancar R2 — Cronómetro.

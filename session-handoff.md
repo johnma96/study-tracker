@@ -76,7 +76,15 @@ y la semilla ampliada. `RF-10` a `RF-15` implementados y verificados en local.
 
 ## Blockers
 
-Ninguno. R2 puede empezar de inmediato.
+**Uno, y requiere la consola de Neon: falta el branch `dev`.**
+
+Hoy local y producción apuntan al mismo branch. La verificación de R1 llegó a insertar y borrar
+filas en la base que sirve el despliegue. Se limpió y se confirmó, pero **R2 es donde empiezan a
+existir sesiones reales que importa no perder**, así que deja de ser opcional.
+
+Pasos: en el panel de Neon, crear un branch `dev` desde el principal, copiar su cadena de
+conexión y ponerla en el `.env` local. El branch principal se reserva para el despliegue de
+Vercel. Después, `npm run db:push` y `npm run db:seed` contra `dev`.
 
 ## Next Session
 

@@ -10,7 +10,9 @@
       "blocked",
       "passing"
     ],
-    "passRule": "Una feature pasa a 'passing' solo con el campo 'evidence' lleno: comando ejecutado y salida resumida. Nunca por inspeccion visual."
+    "passRule": "Una feature pasa a 'passing' solo con el campo 'evidence' lleno: comando ejecutado y salida resumida. Nunca por inspeccion visual.",
+    "activeMeaning": "'active' significa que alguien la esta trabajando AHORA. Cero activas es el estado normal cuando nadie trabaja. No se reserva la siguiente poniendola active por adelantado: una reserva se queda vieja y miente igual que un estado desactualizado. Nunca terminar una sesion con una feature en active.",
+    "doneCriteria": "Todo criterio de verificacion nombra un comando que puede ejecutar quien lo va a ejecutar. La confirmacion humana se registra en evidence con quien verifico y desde donde, pero no bloquea el paso a passing, salvo en R0, donde probar la cadena de despliegue ES el proposito de la rebanada."
   },
   "features": [
     {

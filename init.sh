@@ -50,17 +50,28 @@ echo "--> Instalando dependencias"
 npm install
 
 # --- 4. Verificacion ----------------------------------------------------------
-echo "--> Verificando tipos"
-npm run check --if-present
+# NO usar `npm run <x> --if-present`: si el script no existe, npm termina en 0 sin
+# imprimir nada, y la AUSENCIA de verificacion se ve identica a una verificacion
+# que pasa. Durante toda la rebanada R0 las pruebas "pasaron" porque no existian.
+# Aqui cada script requerido se exige de forma explicita.
 
-echo "--> Lint"
-npm run lint --if-present
+require_script() {
+  local nombre="$1"
+  if ! node -e "process.exit(require('./package.json').scripts?.['$nombre'] ? 0 : 1)"; then
+    echo "" >&2
+    echo "ERROR: falta el script '$nombre' en package.json." >&2
+    echo "AGENTS.md lo declara comando de verificacion obligatorio." >&2
+    echo "Agregalo, o corrige AGENTS.md si de verdad ya no aplica." >&2
+    exit 1
+  fi
+  echo "--> $nombre"
+  npm run "$nombre"
+}
 
-echo "--> Pruebas"
-npm run test --if-present
-
-echo "--> Build"
-npm run build --if-present
+require_script check
+require_script lint
+require_script test
+require_script build
 
 echo ""
 echo "Init OK."

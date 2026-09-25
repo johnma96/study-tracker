@@ -43,10 +43,25 @@ adopción de la metodología.
 Cuando los dos propósitos entren en conflicto, gana el producto: un harness excelente sobre
 una herramienta que nadie usa no enseña nada.
 
-## Estado actual
+## Dónde vive el estado
 
-**Semilla.** Documentación y harness completos; **sin código todavía**. La primera rebanada
-por implementar es R0 (esqueleto caminante). Ver [`docs/ROADMAP.md`](./docs/ROADMAP.md).
+**Este archivo no describe el estado del repositorio, a propósito.**
+
+| Pregunta | Archivo que la responde |
+|---|---|
+| ¿Qué está hecho y con qué evidencia? | [`feature_list.json`](./feature_list.json) |
+| ¿Dónde quedó la sesión anterior y qué sigue? | [`session-handoff.md`](./session-handoff.md) |
+| ¿Qué pasó en cada sesión y por qué? | [`progress.md`](./progress.md) |
+| ¿Cuál es el plan completo? | [`docs/ROADMAP.md`](./docs/ROADMAP.md) |
+
+> Antes este archivo declaraba el estado del proyecto, y quedó desactualizado: siguió diciendo
+> "semilla, sin código todavía" cuando ya había dos rebanadas cerradas. El flujo de arranque lo
+> hace leer en el paso 2, así que cada agente recibía un estado falso mientras armaba su modelo
+> mental del repositorio.
+>
+> La causa no fue descuido: fue poner **estado mutable en un documento que cambia poco**. La
+> regla que queda es que cada dato tenga un solo dueño. Los documentos permanentes explican el
+> *porqué*; el estado vive en los archivos de arriba, que se reescriben cada sesión.
 
 ## Nota sobre el idioma
 

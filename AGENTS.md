@@ -75,13 +75,59 @@ Una feature está *done* **only when** se cumple todo esto:
 Nunca marques `passing` por inspección visual ni porque "debería funcionar". El estado avanza
 únicamente con evidencia de un comando ejecutado.
 
+### Todo criterio de hecho debe nombrar un comando
+
+Un criterio de verificación tiene que poder ejecutarlo **quien lo va a ejecutar**. Los criterios
+de `docs/ROADMAP.md` se escriben en dos partes:
+
+| Parte | Qué es | ¿Bloquea `passing`? |
+|---|---|---|
+| **Verificación ejecutable** | Comandos concretos, con su salida esperada | **Sí** |
+| **Confirmación humana** | Lo que una persona comprueba en el navegador | **No**, salvo que la rebanada trate justamente de la cadena de despliegue |
+
+> Esta regla salió de un defecto real. Los siete criterios de hecho del ROADMAP estaban escritos
+> como *"creas un programa por la interfaz, recargas y sigue ahí"* — imposible para un agente sin
+> navegador, y sin embargo la *Definition of Done* exigía evidencia ejecutable. El harness pedía
+> dos cosas incompatibles a la vez.
+>
+> Consecuencia de diseño: si una regla de negocio solo se puede comprobar con un clic, es que
+> está en la capa equivocada. Muévela a `core/`, donde se prueba sin navegador y sin base de
+> datos. La interfaz debe quedarse con lo que de verdad es presentación.
+
+La confirmación humana **sí se registra**: va en `evidence`, diciendo quién verificó, desde
+dónde y cuándo. Una evidencia que nadie puede reproducir tiene que declarar en qué condiciones
+se obtuvo, o deja de ser evidencia y pasa a ser una afirmación.
+
 ## Scope
 
-**One feature at a time.** `feature_list.json` admite como máximo un `status: "active"`. Si
-encuentras dos, es un error: detente y corrígelo antes de programar.
+**One feature at a time.** `active` significa **"alguien la está trabajando ahora mismo"**, no
+"es la siguiente". Reglas:
+
+- Nunca más de una `active`. Si encuentras dos, es un error: detente y corrígelo antes de
+  programar.
+- **Cero `active` es el estado normal cuando nadie está trabajando.** No reserves la siguiente
+  poniéndola en `active` por adelantado: una reserva se queda vieja y miente igual que un
+  estado desactualizado. El paso 8 del *Startup Workflow* ya sabe cuál sigue.
+- Al empezar, pon en `active` la que vas a trabajar. Al cerrar la sesión, déjala en `passing`
+  o en `blocked`. **Nunca termines una sesión con una feature en `active`**: eso significa que
+  alguien está trabajando, y nadie lo está.
 
 **Stay in scope.** Si detectas un problema fuera de la feature activa, **no lo arregles**.
 Anótalo en `progress.md` bajo "Hallazgos fuera de alcance" y sigue.
+
+**Excepción: la documentación de arranque siempre está en alcance.** Si encuentras que
+`AGENTS.md`, `CLAUDE.md`, `docs/ROADMAP.md`, `docs/ARCHITECTURE.md`, `docs/REQUIREMENTS.md` o
+`docs/DATA-MODEL.md` **contradicen la realidad** —un comando que no funciona, un estado falso,
+dos documentos que se contradicen entre sí— corrígelo en la misma sesión y regístralo en
+`progress.md`. No esperes a que "esté en alcance".
+
+> Esta excepción existe porque la regla anterior, sola, era incoherente: protegía el código
+> pero dejaba pudrirse los documentos que el propio harness declara más importantes que
+> cualquier feature. Un agente que obedece "Stay in scope" al pie de la letra deja una
+> instrucción falsa en pie para el siguiente, y el error se compone.
+>
+> El límite: corriges lo que es **falso**, no lo que te parece mejorable. Reescribir un
+> documento porque lo redactarías distinto sí está fuera de alcance.
 
 **Completion gate.** Una feature no se cierra si su cierre requiere tocar código de otra
 feature. Si al terminar descubres que necesitas cambiar algo fuera de su alcance, la feature

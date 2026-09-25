@@ -44,7 +44,12 @@ Next.js 16 con App Router, Tailwind, TypeScript estricto. Conexión a Neon con D
 tabla, una fila, una página que la muestra. Desplegado en Vercel.
 
 - **Requerimientos:** RF-01
-- **Hecho cuando:** la URL de Vercel carga y muestra el dato leído de la base de datos.
+- **Verificación ejecutable:** `./init.sh` termina en `Init OK`; `npm run dev` y
+  `curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/` devuelve `200`, y el HTML
+  contiene el nombre del programa semilla.
+- **Confirmación humana (bloquea, excepcionalmente):** la URL de Vercel carga el dato. Es la
+  única rebanada donde la confirmación humana bloquea, porque probar la cadena de despliegue
+  **es** su propósito.
 - **Trampa conocida:** la variable `DATABASE_URL` debe existir tanto en local (`.env`) como en
   las variables de entorno del proyecto en Vercel. Es el fallo más común de esta rebanada.
 
@@ -54,7 +59,10 @@ Crear, listar y sembrar. Al final debe existir el programa "Harness Engineering"
 cuatro tipos de sesión.
 
 - **Requerimientos:** RF-10 … RF-15
-- **Hecho cuando:** creas un programa por la interfaz, recargas y sigue ahí.
+- **Verificación ejecutable:** `npm run test` pasa, con pruebas de `core/` que cubran el orden
+  de `RF-13` (incluidas fechas nulas) y los límites de nombre de `RF-14`; revertir cualquiera de
+  las dos reglas hace fallar la suite. `npm run db:seed` dos veces demuestra idempotencia.
+- **Confirmación humana:** crear un programa desde el formulario y verlo tras recargar.
 
 ### R2 — Cronómetro · 2 sesiones · **el corazón del MVP**
 
@@ -62,9 +70,17 @@ Iniciar, pausar, reanudar, detener, cancelar, registro manual y recuperación de
 abandonada.
 
 - **Requerimientos:** RF-00, RF-20 … RF-29, RF-2A … RF-2I
-- **Hecho cuando:** las tres pruebas manuales pasan — sobrevive a cerrar el navegador, una
-  pausa de 10 minutos no se acumula, y una sesión huérfana de más de 8 horas se puede
-  desbloquear desde el diálogo de recuperación.
+- **Verificación ejecutable:** `npm run test` cubre los seis casos de duración efectiva de
+  `docs/DATA-MODEL.md` sin tocar la base; más una prueba de integración que (1) inicia una
+  sesión, la lee de nuevo desde la base y comprueba que el tiempo se deriva de `started_at`,
+  (2) intenta iniciar una segunda y verifica que el índice único la rechaza, (3) fabrica una
+  sesión con `started_at` de hace 9 horas y comprueba que la consulta de recuperación la
+  detecta y que cerrarla libera el índice.
+- **Confirmación humana:** iniciar, cerrar el navegador, reabrir y ver el cronómetro corriendo
+  con el tiempo correcto.
+
+> El punto (1) es la prueba clave y **se hace releyendo desde la base**, no inspeccionando la
+> pantalla: lo que se verifica es que el tiempo no vive en el navegador.
 
 Cuatro cosas que definen si esta rebanada quedó bien:
 
@@ -84,8 +100,10 @@ Cuatro cosas que definen si esta rebanada quedó bien:
 Días trabajados, horas, media, racha, mapa de calor, cadencia.
 
 - **Requerimientos:** RF-30 … RF-37
-- **Hecho cuando:** los números coinciden con la suma hecha a mano sobre las sesiones
-  registradas.
+- **Verificación ejecutable:** `npm run test` con funciones puras de `core/` que reciban una
+  lista de sesiones y devuelvan días, horas, media, racha y cadencia, contrastadas contra
+  valores calculados a mano en la propia prueba. **Caso obligatorio:** una sesión iniciada a
+  las 23:40 hora de Colombia cuenta en ese día y no en el siguiente.
 - **Trampa conocida:** agrupar por día sin convertir a `America/Bogota`. Prueba con una sesión
   iniciada después de las 19:00 hora de Colombia; si aparece en el día siguiente, está mal.
 
@@ -94,22 +112,32 @@ Días trabajados, horas, media, racha, mapa de calor, cadencia.
 Adjuntar artefactos a una sesión y verlos como enlaces.
 
 - **Requerimientos:** RF-50 … RF-54
-- **Hecho cuando:** un artefacto de tipo `doc` abre el archivo real en GitHub.
+- **Verificación ejecutable:** `npm run test` cubre la validación de artefactos (tipos
+  permitidos de `RF-51`, destino obligatorio) y que `RF-54` se cumple: ninguna ruta del
+  repositorio escribe archivos. Una prueba de integración adjunta dos artefactos a una sesión y
+  los recupera.
+- **Confirmación humana:** un artefacto de tipo `doc` abre el archivo real en GitHub.
 
 ### R5 — Métricas · 1-2 sesiones
 
 Definir métricas por programa, registrar lecturas, graficar la serie.
 
 - **Requerimientos:** RF-60 … RF-63
-- **Hecho cuando:** cargas los scores de `validate-harness.mjs` del curso y ves la curva con
-  su línea de objetivo en 80.
+- **Verificación ejecutable:** `npm run test` cubre la comparación de `RF-63` —si la última
+  lectura mejoró o empeoró— para métricas con dirección `up` y `down`, incluido el empate. Una
+  prueba de integración crea una métrica, registra tres lecturas y las recupera en orden.
+- **Confirmación humana:** cargar los scores reales de `validate-harness.mjs` y ver la curva
+  con su línea de objetivo en 80.
 
 ### R6 — Autenticación · 1 sesión · compuerta
 
 Auth.js con un proveedor OAuth y lista blanca por variable de entorno.
 
 - **Requerimientos:** RF-40 … RF-44
-- **Hecho cuando:** un navegador sin sesión no puede leer ni escribir nada.
+- **Verificación ejecutable:** `curl` sin credenciales contra una ruta de lectura y contra una
+  Server Action devuelve 401 o 403, nunca 200 con datos. Una prueba cubre que un correo fuera
+  de la lista blanca se rechaza (`RF-42`).
+- **Confirmación humana:** un navegador sin sesión no puede leer ni escribir nada.
 - **Cuándo hacerla:** no es la última rebanada del cronograma, es una **compuerta**. Mientras
   la base solo tenga datos de prueba puede esperar. En el momento en que registre sesiones
   reales que te importe perder o exponer, es obligatoria antes del siguiente despliegue.
