@@ -17,24 +17,35 @@ Before writing code, en este orden:
    re-litigues.**
 6. Lee [`docs/DATA-MODEL.md`](./docs/DATA-MODEL.md) — entidades, invariantes y DDL.
 7. Ejecuta `./init.sh` y corrige cualquier error antes de continuar.
-8. Lee [`feature_list.json`](./feature_list.json) y toma la feature con `status: "active"`. Si
-   ninguna está activa, toma la primera `not_started` cuyas `dependencies` estén en `passing`.
+8. Lee [`feature_list.json`](./feature_list.json) y selecciona la feature a trabajar:
+   1. La que tenga `status: "active"`.
+   2. Si ninguna está activa, la primera `not_started` cuyas `dependencies` estén todas en
+      `passing`.
+   3. **Si ninguna califica** —porque la única avanzada quedó en `blocked` y las demás dependen
+      de ella— **no empieces ninguna feature.** Reporta cuál es el bloqueo, qué hace falta para
+      levantarlo y quién puede hacerlo. Detente ahí.
+
+   > El caso 3 es real y ya ocurrió: con R0 en `blocked` esperando un despliegue que depende del
+   > usuario, y R1 dependiendo de R0 en `passing`, la regla no seleccionaba nada. Un agente sin
+   > esta cláusula se queda sin siguiente paso, o peor, se inventa uno.
 9. Lee [`session-handoff.md`](./session-handoff.md) para saber dónde quedó la sesión anterior.
 
 ## Verification Commands
 
 ```bash
-./init.sh            # instala, verifica tipos y construye. Puerta de entrada.
-npm run check        # tsc --noEmit
+./init.sh            # instala, verifica tipos, lint y build. Puerta de entrada.
+npm run check        # next typegen && tsc --noEmit
 npm run lint         # eslint
-npm run test         # vitest run
+npm run test         # vitest run  (existe a partir de R1)
 npm run build        # next build
 npm run dev          # servidor local
 npm run db:push      # aplica el esquema a la base de datos
+npm run db:seed      # siembra los datos iniciales (idempotente)
 ```
 
-Mientras no exista `package.json`, `./init.sh` solo valida el entorno y termina con éxito.
-Es el comportamiento correcto en estado semilla.
+`check` **debe** incluir `next typegen` antes de `tsc`. Sobre un clon limpio, `tsc --noEmit`
+a secas falla: la plantilla de Next 16 usa tipos globales como `LayoutProps<"/">` que Next
+genera en `.next/types`. Sin el typegen previo, un clon recién hecho no compila.
 
 ## Definition of Done
 
@@ -42,8 +53,18 @@ Una feature está *done* **only when** se cumple todo esto:
 
 - `npm run check` pasa sin errores.
 - `npm run lint` pasa sin errores.
-- `npm run test` pasa, y la feature tiene al menos una prueba que falla si se revierte el cambio.
 - `npm run build` construye sin errores.
+- **Prueba automatizada**, según el tipo de rebanada:
+  - Si la rebanada **introduce lógica de dominio** (cálculos, reglas, validaciones):
+    `npm run test` pasa y hay al menos una prueba que **falla si se revierte el cambio**.
+  - Si la rebanada **es de infraestructura** y no introduce lógica de dominio (por ejemplo un
+    esqueleto caminante): la verificación exigida es de humo — un comando que comprueba que la
+    cadena responde de punta a punta. La evidencia es ese comando y su salida.
+
+  > Una rebanada de infraestructura no puede tener una prueba unitaria que falle al revertirla,
+  > porque no hay lógica que revertir. Exigirla igual convierte la definición de *done* en algo
+  > insatisfacible, y un criterio imposible se ignora en vez de cumplirse. Lo que **no** se
+  > negocia es que haya *alguna* verificación ejecutable.
 - El comportamiento cumple el requerimiento EARS correspondiente de
   [`docs/REQUIREMENTS.md`](./docs/REQUIREMENTS.md), citado por su identificador `RF-XX`.
 - En `feature_list.json` la feature quedó en `status: "passing"` **con el campo `evidence`

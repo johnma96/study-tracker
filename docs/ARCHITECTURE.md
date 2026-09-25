@@ -79,12 +79,27 @@ Toda Server Action valida su entrada en el servidor con un esquema (`zod` o equi
 
 ## Comandos de arranque para la rebanada 0
 
+> **`create-next-app` se niega a escribir sobre este repositorio.** El directorio ya tiene
+> archivos propios (`AGENTS.md`, `CLAUDE.md`, `feature_list.json`, `init.sh`…) y la plantilla
+> trae su propio `AGENTS.md`, `CLAUDE.md`, `README.md` y `.gitignore`, que pisarían el harness.
+> Andamia en un subdirectorio temporal y mueve solo lo que no colisiona. Comprobado el
+> 24/09/2026: el comando con `.` falla.
+
 ```bash
-npx create-next-app@latest . --typescript --tailwind --app --eslint --src-dir
+npx create-next-app@latest .tmp-scaffold --typescript --tailwind --app --eslint --src-dir
+# mover de .tmp-scaffold lo que no pise el harness, y borrar el temporal
 npm install drizzle-orm @neondatabase/serverless
-npm install -D drizzle-kit vitest
-npx shadcn@latest init
+npm install -D drizzle-kit
 ```
+
+**Vitest entra en R1, no en R0**, y **shadcn/ui en R3**. R0 no tiene lógica de dominio que
+probar ni tableros que construir; instalarlos antes es configuración para código que todavía
+no existe. `docs/ROADMAP.md` manda sobre el alcance de cada rebanada.
+
+Además, en `next.config.ts` queda `agentRules: false`. `next dev` inyecta por su cuenta un
+bloque `nextjs-agent-rules` dentro de `AGENTS.md` y lo re-agrega en cada arranque. En este
+repositorio `AGENTS.md` es el harness canónico: su contenido es decisión del autor, no de una
+herramienta del build.
 
 Variables de entorno necesarias (documéntalas en `.env.example`):
 
@@ -114,3 +129,6 @@ APP_TIMEZONE=America/Bogota
 | 4 | Sin subida de archivos en el MVP | 24/09/2026 | La evidencia vive en sus repos; aquí se enlaza |
 | 5 | Sin CQRS | 24/09/2026 | Ceremonia sin beneficio para un usuario |
 | 6 | Autenticación como compuerta, no como etapa | 24/09/2026 | Vercel publica en internet abierto |
+| 7 | Vitest en R1, shadcn/ui en R3, no en R0 | 25/09/2026 | R0 no tiene lógica que probar ni tableros que construir |
+| 8 | `agentRules: false` en `next.config.ts` | 25/09/2026 | `next dev` reescribe `AGENTS.md`, el archivo canónico del harness |
+| 9 | `APP_TIMEZONE` en vez de `TZ` | 25/09/2026 | Vercel reserva `TZ`; de fondo, la zona es regla de dominio, no configuración |
