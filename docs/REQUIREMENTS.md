@@ -293,7 +293,7 @@ del cliente.
 | 2b Pausas | RF-2A … RF-2E | Descansos sin inflar ni fragmentar |
 | 2c Recuperación | RF-2F … RF-2I | Una sesión abandonada no bloquea |
 | 3 Totales | RF-30 … RF-37 | Días, horas, mapa de calor, cadencia |
-| 8 Contexto | RF-38, RF-39 | Un programa gobierna la página; la URL lo conserva |
 | 4 Evidencia | RF-50 … RF-54 | Artefactos enlazados |
 | 5 Métricas | RF-60 … RF-63 | Series de progreso |
 | 6 Acceso | RF-40 … RF-44 | Autenticación |
+| 8 Contexto | RF-38, RF-39 | Un programa gobierna la página; la URL lo conserva |

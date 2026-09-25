@@ -95,6 +95,17 @@ Una feature está *done* **only when** se cumple todo esto:
   > porque no hay lógica que revertir. Exigirla igual convierte la definición de *done* en algo
   > insatisfacible, y un criterio imposible se ignora en vez de cumplirse. Lo que **no** se
   > negocia es que haya *alguna* verificación ejecutable.
+
+  - Si el cambio corrige un **defecto de reconciliación de interfaz** —una `key` que React
+    necesita para no reutilizar una instancia, un estado que no se reinicia al navegar—: hoy
+    **no hay forma de probarlo** y se sostiene con un comentario en el código que explique qué
+    se rompe al quitarlo, más su entrada en `progress.md`.
+
+    > Esto es una deuda declarada, no una excepción cómoda. Ha aparecido **tres sesiones
+    > seguidas** (la `key` de pausar/reanudar, y tres más en el selector de programa) y cae
+    > entre las dos casillas anteriores: quitar la `key` no rompe ninguna prueba, y `curl` no lo
+    > ve porque solo se manifiesta al navegar. La salida real es montar un entorno de pruebas de
+    > componentes; mientras no exista, esta categoría queda nombrada en vez de caer en el vacío.
 - El comportamiento cumple el requerimiento EARS correspondiente de
   [`docs/REQUIREMENTS.md`](./docs/REQUIREMENTS.md), citado por su identificador `RF-XX`.
 - En `feature_list.json` la feature quedó en `status: "passing"` **con el campo `evidence`
@@ -140,6 +151,15 @@ se obtuvo, o deja de ser evidencia y pasa a ser una afirmación.
 - Al empezar, pon en `active` la que vas a trabajar. Al cerrar la sesión, déjala en `passing`
   o en `blocked`. **Nunca termines una sesión con una feature en `active`**: eso significa que
   alguien está trabajando, y nadie lo está.
+- **Esto incluye las sesiones de planificación.** Agregar una feature nueva al plan la deja en
+  `not_started`, nunca en `active`, aunque sea evidente cuál sigue. El paso 8 del *Startup
+  Workflow* ya sabe seleccionarla.
+
+  > Se incumplió en el commit `e2a599e`, que planificó R8 y R9 y dejó R8 en `active` con
+  > `evidence: null` sin que nadie la estuviera trabajando —exactamente la reserva que esta
+  > regla prohíbe—. Lo detectó el agente que la implementó. **Una regla que el propio flujo de
+  > planificación viola es una regla que va a seguir violándose**, así que queda dicho aquí en
+  > vez de confiar en recordarlo.
 
 **Stay in scope.** Si detectas un problema fuera de la feature activa, **no lo arregles**.
 Anótalo en `progress.md` bajo "Hallazgos fuera de alcance" y sigue.
@@ -158,9 +178,21 @@ dos documentos que se contradicen entre sí— corrígelo en la misma sesión y 
 > El límite: corriges lo que es **falso**, no lo que te parece mejorable. Reescribir un
 > documento porque lo redactarías distinto sí está fuera de alcance.
 
-**Completion gate.** Una feature no se cierra si su cierre requiere tocar código de otra
-feature. Si al terminar descubres que necesitas cambiar algo fuera de su alcance, la feature
-queda en `blocked` con el motivo, no en `passing`.
+**Completion gate.** Una feature no se cierra si su cierre requiere **arreglar un defecto** de
+otra feature. Si al terminar descubres que necesitas corregir algo roto fuera de su alcance, la
+feature queda en `blocked` con el motivo, no en `passing`.
+
+> **Atravesar otras features por diseño no es lo mismo que arreglarlas.** Una rebanada
+> transversal —un contexto que gobierna toda la página, un cambio de tema, una extracción
+> compartida— modifica código de varias features **porque eso es lo que es**, y su plan lo dice
+> de antemano en `docs/ROADMAP.md`. Esa no se bloquea.
+>
+> La regla anterior decía «tocar código de otra feature» y dejaba a R8 imposible de cerrar: su
+> trabajo *era* rewirear las secciones de R3, R4 y R5, y el ROADMAP lo daba por hecho. Leída al
+> pie de la letra, ninguna rebanada transversal podría pasar nunca a `passing`.
+>
+> El criterio: **¿el plan preveía tocar eso?** Si sí, está en alcance. Si apareció porque algo
+> estaba roto, se bloquea o se registra como hallazgo fuera de alcance.
 
 Reglas adicionales:
 
