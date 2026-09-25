@@ -15,9 +15,11 @@ modelo.
 
 ## Estado
 
-**R0 en local, sin desplegar.** La aplicación existe: lee la tabla `programs` de Neon y muestra
-el programa semilla en la página raíz. Falta el despliegue en Vercel, que es el criterio de
-hecho de R0. Ver [`session-handoff.md`](./session-handoff.md).
+**R0 cerrada. En marcha: R1 — Programas.**
+
+Desplegada en **<https://study-tracker-eight-sigma.vercel.app/>** — lee la tabla `programs` de
+Neon y muestra el programa semilla. Ver [`session-handoff.md`](./session-handoff.md) para el
+estado exacto y el siguiente paso.
 
 ## Stack
 

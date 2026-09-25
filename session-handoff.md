@@ -1,110 +1,79 @@
 # session-handoff.md
 
-**Last Updated:** 24/09/2026
+**Last Updated:** 25/09/2026
 
 > Encabezados de sección en inglés a propósito: son los marcadores estructurales que buscan las
 > herramientas de auditoría del harness. El contenido va en español.
 
 ## Current Objective
 
-Cerrar **R0 — Esqueleto caminante**. La aplicación ya existe y funciona en local contra Neon;
-falta lo único que R0 exige para considerarse hecha: **la URL de producción en Vercel cargando
-el dato leído de la base**. Ese paso necesita el navegador del usuario.
+Implementar **R1 — Programas**: crear y listar programas, y ampliar la semilla con los cuatro
+tipos de sesión y la métrica del curso.
 
-Mientras R0 no esté en `passing`, **no se empieza R1**: la dependencia es explícita en
-`feature_list.json`.
+Requerimientos: `RF-10` a `RF-15` en `docs/REQUIREMENTS.md`.
+
+**Vitest se instala al abrir esta rebanada.** R1 sí introduce lógica de dominio —validación de
+nombre, orden de listado— así que aplica la regla completa de la *Definition of Done*: al menos
+una prueba que falle si se revierte el cambio.
 
 ## What was done
 
-Implementación completa de R0 en local, como rebanada vertical: esquema → repositorio →
-página.
+**R0 cerrada en `passing`.** La aplicación está desplegada y sirviendo datos de Neon en
+<https://study-tracker-eight-sigma.vercel.app/>. La cadena completa —repositorio, build,
+despliegue, base de datos, render— quedó probada, que era el único propósito de esa rebanada.
 
-- **Andamiaje.** `create-next-app@latest`: Next.js 16.3.6, React 19.2.8, TypeScript estricto,
-  Tailwind 4, ESLint, `src/`. Sin shadcn/ui ni Recharts: entran en R3.
-- **Datos.** `drizzle-orm` 0.45.3, `@neondatabase/serverless` 1.1.0, `drizzle-kit` 0.31.11.
-  Tabla `programs` aplicada a Neon con `npm run db:push`, programa semilla "Harness
-  Engineering" insertado con `npm run db:seed`.
-- **Capas** de `docs/ARCHITECTURE.md` respetadas desde el primer archivo: `core/` no importa
-  nada de `app/`, `infra/` ni `ui/`.
-- **Scripts nuevos:** `check`, `db:push`, `db:seed`.
-- **Verificado:** `npm run check`, `npm run lint`, `npm run build` y `./init.sh` completo pasan.
-  `npm run dev` sirve `http://localhost:3000/` con HTTP 200 y el HTML contiene "Harness
-  Engineering", "walkinglabs", "course", "active" y 41, leídos de la tabla.
+Después del despliegue se corrigieron **cinco huecos del harness** detectados al construir R0.
+Todos salieron de ejecutarlo contra código real; ninguno habría aparecido releyendo documentos:
 
-El DDL de `docs/DATA-MODEL.md` se ejecutó por primera vez y el motor no rechazó nada. Las tres
-diferencias entre lo especificado y lo aplicado están registradas en `progress.md`, sesión 3.
+1. `docs/ARCHITECTURE.md` indicaba `create-next-app .`, que **falla** sobre un repositorio con
+   archivos propios. Documentado el andamiaje en subdirectorio temporal.
+2. La *Definition of Done* era insatisfacible para una rebanada de infraestructura. Ahora
+   distingue rebanadas con lógica de dominio de las que no la tienen.
+3. La regla de selección de feature podía quedarse sin candidata. Se agregó el caso 3.
+4. `check` estaba documentado como `tsc --noEmit`; sobre un clon limpio hace falta
+   `next typegen` antes.
+5. `ARCHITECTURE` contradecía al `ROADMAP` sobre shadcn en R0.
+
+También: `TZ` renombrada a `APP_TIMEZONE` porque Vercel reserva ese nombre.
 
 ## What is broken or unverified
 
-- **Sin desplegar.** Nada de la cadena de despliegue —importación del repositorio, build en
-  Vercel, variable de entorno en producción— ha sido ejercitado. Es exactamente lo que R0
-  existe para probar, y es lo que falta.
-- **Sin pruebas automatizadas.** No hay Vitest todavía. R0 no tiene lógica de dominio que
-  probar; la primera prueba real llega con R1/R2, donde viven las reglas de cálculo.
+- **Sin pruebas automatizadas todavía.** Vitest no está instalado. Es lo primero de R1.
 - **Sin migraciones versionadas.** Se usa `drizzle-kit push`. Sirve mientras la base no tenga
-  datos que importe perder; deja de servir en cuanto haya sesiones reales.
-- **`npm run check` incluye `next typegen`.** `AGENTS.md` lo documenta como `tsc --noEmit`, pero
-  sobre un clon limpio eso falla: la plantilla usa el tipo global `LayoutProps<"/">`, que Next
-  genera. El script ya hace lo correcto; el que quedó desactualizado es `AGENTS.md`.
-- **`docs/ARCHITECTURE.md` sigue listando `npx shadcn@latest init` entre los comandos de R0**,
-  en contra de `docs/ROADMAP.md`. No se tocó: corregirlo está fuera del alcance de R0.
+  datos que importe perder; deja de servir en cuanto haya sesiones reales registradas.
+- **Un solo branch de Neon.** Local y producción apuntan a la misma base, contra lo que plantea
+  `docs/ARCHITECTURE.md`. Crear un branch `dev` es barato y conviene hacerlo antes de que haya
+  datos reales.
+- **`APP_TIMEZONE` no la lee ningún código.** Y según el análisis registrado en
+  `ARCHITECTURE.md` probablemente deba ser una constante en `core/`, no una variable de
+  entorno. Se decide cuando R3 implemente la agrupación por día.
+- **La verificación de despliegues exige un dispositivo fuera de la red corporativa.** La VPN
+  de Protección bloquea `vercel.app` y la interceptación TLS impide comprobarlo desde la
+  máquina de trabajo, incluso por línea de comandos.
 
 ## Files
 
-Nuevos:
-
-```
-next.config.ts  next-env.d.ts  tsconfig.json  eslint.config.mjs  postcss.config.mjs
-package.json  package-lock.json  drizzle.config.ts
-scripts/seed.mjs
-src/app/{layout.tsx,page.tsx,globals.css,favicon.ico}
-src/core/model/program.ts
-src/core/ports/program-repository.ts
-src/infra/db/{schema.ts,client.ts}
-src/infra/repos/drizzle-program-repository.ts
-src/ui/program-card.tsx
-public/*.svg
-```
-
-Modificados: `.gitignore` (se agregó `*.tsbuildinfo`), `README.md` (estado y arranque),
-`feature_list.json`, `progress.md`, este archivo.
-
-`AGENTS.md` quedó **intacto**: `next dev` intentó inyectarle un bloque propio y se desactivó
-con `agentRules: false` en `next.config.ts`. Ver `progress.md`, sesión 3.
+Sin cambios de código en esta sesión. Modificados: `feature_list.json`, `progress.md`,
+`README.md`, `AGENTS.md`, `docs/ARCHITECTURE.md`, `.env.example` y este archivo.
 
 ## Blockers
 
-**Uno, y depende del usuario: el despliegue en Vercel.** Pasos exactos:
-
-1. Empujar la rama: `git push origin main`. El commit de esta sesión ya está hecho, sin push.
-2. En `vercel.com/new`, importar `johnma96/study-tracker`. Vercel detecta Next.js solo: no hay
-   que cambiar framework, comando de build ni directorio de salida.
-3. **Antes de pulsar Deploy**, en *Environment Variables* agregar `DATABASE_URL` con el mismo
-   valor que tiene el `.env` local, marcada para Production, Preview y Development. Es la
-   trampa conocida de R0: la variable tiene que existir **en los dos lados**.
-4. Desplegar y abrir la URL. Debe mostrar la tarjeta "Harness Engineering · walkinglabs ·
-   course · active · 41".
-5. Si la página muestra "No se pudo leer de la base de datos", la variable no llegó: revisarla
-   en *Settings → Environment Variables* y volver a desplegar (un cambio de variable no
-   redespliega solo).
-6. Con la URL funcionando, pasar R0 a `passing` en `feature_list.json` y poner la URL en
-   `evidence`.
-
-Opcional y recomendable después: en Neon, crear un branch `dev` para desarrollo local y dejar
-el branch principal para producción, como plantea `docs/ARCHITECTURE.md`. Hoy local y
-producción apuntan a la misma base.
+Ninguno. R1 puede empezar de inmediato.
 
 ## Next Session
 
-Recommended Next Step: **desplegar y cerrar R0**, después arrancar **R1 — Programas**.
+Recommended Next Step: implementar **R1 — Programas**.
 
 1. `cd study-tracker` y confirmar con `pwd`. No trabajar desde el repositorio del curso.
 2. `./init.sh` — debe terminar en "Init OK".
-3. Cerrar R0 con la URL de producción como evidencia, según los pasos de *Blockers*.
-4. Poner R1 en `active` y leer `docs/REQUIREMENTS.md`, RF-10 a RF-15.
-5. R1 trae lo que R0 dejó deliberadamente afuera: `session_types`, el orden de listado de
-   RF-13, la validación de nombre de RF-14 en el servidor con `zod` o equivalente, y la
-   semilla completa (los cuatro tipos de sesión E/C/K/V y la métrica "Harness score").
-   `scripts/seed.mjs` es el sitio natural para ampliarla.
-6. Instalar Vitest al empezar R1: desde ahí sí hay comportamiento que probar y `AGENTS.md`
-   exige una prueba que falle si se revierte el cambio.
+3. Instalar Vitest y dejar corriendo una primera prueba antes de escribir la feature.
+4. `RF-10` a `RF-14`: crear y listar programas, con validación **en el servidor** (`RF-14`:
+   nombre entre 1 y 120 caracteres) y el orden de `RF-13` (`active` primero, luego fecha de
+   inicio descendente).
+5. `RF-15`: tipos de sesión propios de cada programa. Ampliar `scripts/seed.mjs` con los cuatro
+   del curso —`E` Estudio, `C` Construcción, `K` Consolidación, `V` Checkpoint— y la métrica
+   "Harness score" (unidad "puntos", dirección `up`, objetivo 80).
+6. Cerrar según el procedimiento "End of Session" de `AGENTS.md`.
+
+Recordatorio de alcance: R1 **no** incluye cronómetro. Eso es R2, y trae consigo las pausas y
+el flujo de recuperación de sesión abandonada.

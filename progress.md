@@ -2,14 +2,12 @@
 
 ## Current State
 
-**Última actualización:** 24/09/2026
-**Feature activa:** ninguna. R0 quedó en `blocked` a la espera del despliegue en Vercel.
-**Estado del repositorio:** aplicación Next.js 16 funcionando en local contra Neon. La página
-raíz lee la tabla `programs` y muestra el programa semilla "Harness Engineering".
-**Bloqueos externos:** importar el repositorio en Vercel y definir `DATABASE_URL` allí. Requiere
-el navegador del usuario.
-**Siguiente paso:** desplegar en Vercel, verificar la URL de producción y cerrar R0 con esa
-evidencia. Solo entonces R1 queda habilitada.
+**Última actualización:** 25/09/2026
+**Feature activa:** R1 — Programas
+**Estado del repositorio:** R0 cerrada en `passing`. Aplicación desplegada y sirviendo datos
+de Neon en <https://study-tracker-eight-sigma.vercel.app/>.
+**Bloqueos:** ninguno.
+**Siguiente paso:** instalar Vitest y arrancar R1 (`RF-10` a `RF-15`).
 
 ---
 
@@ -204,3 +202,50 @@ Desplegar en Vercel y cerrar R0 con la URL de producción como evidencia. Los pa
 están en `session-handoff.md`.
 
 ---
+
+---
+
+### Sesión 4 — 25/09/2026 — cierre de R0 y corrección del harness
+
+**Duración:** ~40 min
+**Objetivo:** cerrar R0 con la URL de producción y corregir los huecos del harness que salieron
+al construirla.
+
+**What was done**
+
+- **R0 a `passing`.** <https://study-tracker-eight-sigma.vercel.app/> carga la tarjeta
+  "Harness Engineering · walkinglabs · course · active · 41" y la línea "1 fila leída de
+  programs". Verificado por el usuario desde un dispositivo fuera de la red corporativa.
+- **R1 a `active`.** Con eso el `feature_list.json` vuelve a tener exactamente una feature
+  activa, como exige la política.
+- **Cinco huecos del harness corregidos** (commit `950f011`): comando de arranque que fallaba,
+  *Definition of Done* insatisfacible para infraestructura, regla de selección sin candidata,
+  `check` mal documentado y contradicción entre `ARCHITECTURE` y `ROADMAP`.
+- **`TZ` renombrada a `APP_TIMEZONE`** (commit `d1a5370`): Vercel reserva ese nombre.
+
+**Decisions**
+
+1. La evidencia de R0 registra **quién** verificó y **desde dónde**. No se puede comprobar el
+   despliegue desde la máquina de trabajo, y ocultarlo habría dejado una evidencia que nadie
+   puede reproducir.
+2. La zona horaria queda como variable de entorno **documentada pero sin usar**. La decisión de
+   moverla a constante de `core/` se toma en R3, cuando exista la agrupación por día.
+
+**Issues**
+
+Ninguno.
+
+**Hallazgos fuera de alcance**
+
+- **La VPN corporativa bloquea `vercel.app`**, y la interceptación TLS también impide llegar
+  por línea de comandos. Toda verificación de despliegue exige un dispositivo externo. R0
+  existe para descubrir fricción en la cadena de despliegue, y encontró una que no es técnica.
+- **El score de `validate-harness.mjs` fue 100/100 antes y después de corregir cinco defectos
+  reales.** La métrica no se movió porque nunca midió lo que estaba roto. Detecta ausencias, no
+  falsedades: un FAIL es información confiable, un PASS solo dice que el archivo existe con el
+  encabezado correcto.
+- Sigue pendiente crear un branch `dev` en Neon. Hoy local y producción comparten base.
+
+**Next session**
+
+Implementar R1 — Programas, empezando por instalar Vitest.

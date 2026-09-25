@@ -1,7 +1,7 @@
 {
   "project": "study-tracker",
   "description": "Tracker de sesiones de estudio multi-programa. Mide tiempo, guarda evidencia y grafica metricas propias de cada programa.",
-  "lastUpdated": "2026-09-24",
+  "lastUpdated": "2026-09-25",
   "policy": {
     "oneFeatureAtATime": true,
     "statusValues": [
@@ -21,10 +21,11 @@
         "RF-01"
       ],
       "dependencies": [],
-      "status": "blocked",
+      "status": "passing",
       "verification": "npm run build && npm run check, y la URL de Vercel carga mostrando el dato",
-      "evidence": "npm run check OK (next typegen && tsc --noEmit, 0 errores). npm run lint OK (eslint, sin hallazgos). npm run build OK (Next 16.3.6, ruta / marcada dinamica). npm run db:push aplico la tabla programs en Neon (PostgreSQL 18.6): columnas y CHECK verificados contra pg_constraint, coinciden con docs/DATA-MODEL.md. npm run db:seed inserto 'Harness Engineering' y es idempotente en la segunda corrida. npm run dev + curl http://localhost:3000/ devuelve HTTP 200 y el HTML contiene 'Harness Engineering', 'walkinglabs', 'course', 'active', 41, leidos de la tabla. ./init.sh corre completo y termina con 'Init OK'. BLOQUEO: falta el despliegue en Vercel (importar el repositorio y definir DATABASE_URL en las variables del proyecto), que requiere el navegador del usuario. El criterio de hecho de R0 es que la URL de produccion cargue el dato, asi que no puede pasar a passing.",
-      "testedAt": "2026-09-24"
+      "evidence": "LOCAL: npm run check OK (next typegen && tsc --noEmit, 0 errores). npm run lint OK. npm run build OK (Next 16.3.6, ruta / marcada dinamica). npm run db:push aplico la tabla programs en Neon (PostgreSQL 18.6): columnas y CHECK verificados contra pg_constraint, coinciden con docs/DATA-MODEL.md. npm run db:seed inserto 'Harness Engineering' y es idempotente. npm run dev + curl http://localhost:3000/ devuelve HTTP 200 con los datos leidos de la tabla. ./init.sh termina en 'Init OK'. PRODUCCION: https://study-tracker-eight-sigma.vercel.app/ desplegada y cargando la tarjeta 'Harness Engineering / walkinglabs / course / active / 41' y la linea '1 fila leida de programs'. Verificado por el usuario el 25/09/2026 desde un dispositivo fuera de la red corporativa: la VPN de Proteccion bloquea vercel.app y la interceptacion TLS impide comprobarlo desde la maquina de trabajo. La cadena completa (repo, build, despliegue, base de datos, render) queda probada, que es el proposito de esta rebanada.",
+      "url": "https://study-tracker-eight-sigma.vercel.app/",
+      "testedAt": "2026-09-25"
     },
     {
       "id": "R1",
@@ -41,8 +42,8 @@
       "dependencies": [
         "R0"
       ],
-      "status": "not_started",
-      "verification": "npm run test -- programs, y crear un programa por la interfaz persiste tras recargar",
+      "status": "active",
+      "verification": "npm run test -- programs (Vitest se instala al abrir esta rebanada), y crear un programa por la interfaz persiste tras recargar",
       "evidence": null,
       "testedAt": null
     },
