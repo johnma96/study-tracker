@@ -1,4 +1,5 @@
 import { loadSessionSnapshot } from '@/app/current-session';
+import { loadRecentEvidence } from '@/app/evidence';
 import { StatsSection } from '@/app/stats-section';
 import type { Program } from '@/core/model/program';
 import type { SessionType } from '@/core/model/session-type';
@@ -7,6 +8,7 @@ import { drizzleProgramRepository } from '@/infra/repos/drizzle-program-reposito
 import { ManualSessionForm } from '@/ui/manual-session-form';
 import { ProgramCard } from '@/ui/program-card';
 import { ProgramForm } from '@/ui/program-form';
+import { SessionEvidence } from '@/ui/session-evidence';
 import { StartSessionForm } from '@/ui/start-session-form';
 import { StopSessionForm } from '@/ui/stop-session-form';
 
@@ -53,6 +55,8 @@ export default async function Home() {
   }
 
   const snapshot = await loadSessionSnapshot();
+  // R4 — evidencia de las sesiones recientes (RF-50 a RF-53).
+  const evidence = await loadRecentEvidence();
   const running = snapshot.running;
   const sessionTypesByProgram = groupByProgram(sessionTypes);
 
@@ -127,6 +131,13 @@ export default async function Home() {
           </section>
 
           <StatsSection programs={programs} sessionTypes={sessionTypes} nowIso={snapshot.nowIso} />
+
+          <SessionEvidence
+            items={evidence.items}
+            unavailable={evidence.unavailable}
+            programs={programs}
+            sessionTypes={sessionTypes}
+          />
 
           <section className="rounded-lg border border-black/10 p-6 dark:border-white/15">
             <h2 className="text-xl font-semibold">Nuevo programa</h2>
